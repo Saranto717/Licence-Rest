@@ -1,10 +1,11 @@
-name: Publish cloud API image
+name: Build and deploy cloud API
 
 on:
   push:
-    paths:
-      - "cloud/RestaurantOrders.Cloud.Api/**"
-      - ".github/workflows/publish-cloud-image.yml"
+    branches:
+      - main
+    tags:
+      - 'v*'
   workflow_dispatch:
 
 permissions:
@@ -13,10 +14,26 @@ permissions:
 
 jobs:
   publish:
+    name: Build and publish image
     runs-on: ubuntu-latest
+    outputs:
+      image_name: ${{ steps.image.outputs.name }}
+      image_tag: ${{ steps.version.outputs.tag }}
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify release tag is on main
+        if: github.ref_type == 'tag'
+        shell: bash
+        run: |
+          git fetch origin main:refs/remotes/origin/main
+          git merge-base --is-ancestor "$GITHUB_SHA" refs/remotes/origin/main || {
+            echo "Release tags must point to a commit on main." >&2
+            exit 1
+          }
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -25,6 +42,21 @@ jobs:
         id: image
         shell: bash
         run: echo "name=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/restaurantorders-cloud-api" >> "$GITHUB_OUTPUT"
+
+      - name: Select image version
+        id: version
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            if [[ ! "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+              echo "Release tag must look like v17.3.113." >&2
+              exit 1
+            fi
+            image_tag="$GITHUB_REF_NAME"
+          else
+            image_tag="latest"
+          fi
+          echo "tag=$image_tag" >> "$GITHUB_OUTPUT"
 
       - name: Sign in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -48,6 +80,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: ./cloud/RestaurantOrders.Cloud.Api
+          platforms: linux/amd64
           push: true
           tags: ${{ steps.metadata.outputs.tags }}
           labels: |
@@ -55,3 +88,77 @@ jobs:
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  deploy:
+    name: Deploy to VPS
+    needs: publish
+    if: >-
+      vars.CLOUD_DEPLOY_ENABLED == 'true' &&
+      ((github.ref_type == 'branch' && github.ref_name == 'main') ||
+       (github.ref_type == 'tag' && startsWith(github.ref_name, 'v')))
+    runs-on: ubuntu-latest
+    env:
+      VPS_HOST: ${{ secrets.VPS_HOST }}
+      VPS_USER: ${{ secrets.VPS_USER }}
+      VPS_DEPLOY_DIR: ${{ secrets.VPS_DEPLOY_DIR }}
+      VPS_SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
+      VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+      IMAGE_NAME: ${{ needs.publish.outputs.image_name }}
+      IMAGE_TAG: ${{ needs.publish.outputs.image_tag }}
+    steps:
+      - name: Checkout deployment files
+        uses: actions/checkout@v4
+
+      - name: Validate deployment settings
+        shell: bash
+        run: |
+          : "${VPS_HOST:?Add the VPS_HOST repository secret}"
+          : "${VPS_USER:?Add the VPS_USER repository secret}"
+          : "${VPS_DEPLOY_DIR:?Add the VPS_DEPLOY_DIR repository secret}"
+          : "${VPS_SSH_PRIVATE_KEY:?Add the VPS_SSH_PRIVATE_KEY repository secret}"
+          : "${VPS_KNOWN_HOSTS:?Add the VPS_KNOWN_HOSTS repository secret}"
+          [[ "$VPS_HOST" =~ ^[A-Za-z0-9.-]+$ ]] || { echo "VPS_HOST must be an IPv4 address or hostname." >&2; exit 1; }
+          [[ "$VPS_USER" =~ ^[A-Za-z_][A-Za-z0-9._-]*$ ]] || { echo "VPS_USER contains unsupported characters." >&2; exit 1; }
+          [[ "$VPS_DEPLOY_DIR" =~ ^/[A-Za-z0-9_./-]+$ ]] || { echo "VPS_DEPLOY_DIR must be an absolute Linux path without spaces." >&2; exit 1; }
+          [[ "/$VPS_DEPLOY_DIR/" != *"/../"* ]] || { echo "VPS_DEPLOY_DIR cannot contain '..'." >&2; exit 1; }
+          [[ "$IMAGE_TAG" == "latest" || "$IMAGE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]] || { echo "Invalid image tag." >&2; exit 1; }
+
+      - name: Configure SSH
+        shell: bash
+        run: |
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$VPS_SSH_PRIVATE_KEY" > "$HOME/.ssh/deploy_key"
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/deploy_key" "$HOME/.ssh/known_hosts"
+
+      - name: Copy Compose deployment files to VPS
+        shell: bash
+        run: |
+          target="${VPS_USER}@${VPS_HOST}"
+          ssh -i "$HOME/.ssh/deploy_key" -o BatchMode=yes -o StrictHostKeyChecking=yes "$target" \
+            "mkdir -p '$VPS_DEPLOY_DIR/init' '$VPS_DEPLOY_DIR/secrets'"
+          scp -i "$HOME/.ssh/deploy_key" -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            deploy/cloud/compose.yaml deploy/cloud/Caddyfile deploy/cloud/.env.example "$target:$VPS_DEPLOY_DIR/"
+          scp -i "$HOME/.ssh/deploy_key" -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            deploy/cloud/init/001-create-app-user.sh "$target:$VPS_DEPLOY_DIR/init/"
+
+      - name: Pull and restart the released version
+        shell: bash
+        run: |
+          target="${VPS_USER}@${VPS_HOST}"
+          image_ref="${IMAGE_NAME}:${IMAGE_TAG}"
+          ssh -i "$HOME/.ssh/deploy_key" -o BatchMode=yes -o StrictHostKeyChecking=yes "$target" \
+            "bash -se -- '$VPS_DEPLOY_DIR' '$image_ref'" <<'REMOTE'
+          set -euo pipefail
+          deploy_dir="$1"
+          image_ref="$2"
+          cd "$deploy_dir"
+          test -f .env || { echo "Missing VPS .env file." >&2; exit 1; }
+          test -s secrets/license-signing-private.pem || { echo "Missing license signing key on VPS." >&2; exit 1; }
+          export CLOUD_API_IMAGE="$image_ref"
+          docker compose --env-file .env config --quiet
+          docker compose --env-file .env pull cloud-api
+          docker compose --env-file .env up -d --remove-orphans
+          docker compose --env-file .env ps
+          REMOTE
+
