@@ -73,40 +73,17 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    expose:
-      - "8080"
+    ports:
+      - "127.0.0.1:8080:8080"
     networks:
-      - edge
       - database
 
-  caddy:
-    image: caddy:2-alpine
-    restart: unless-stopped
-    environment:
-      CLOUD_IP: ${CLOUD_IP:?Set CLOUD_IP in .env}
-      ACME_EMAIL: ${ACME_EMAIL:?Set ACME_EMAIL in .env}
-    ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy-data:/data
-      - caddy-config:/config
-    depends_on:
-      - cloud-api
-    networks:
-      - edge
-
 networks:
-  edge:
   database:
     internal: true
 
 volumes:
   postgres-data:
-  caddy-data:
-  caddy-config:
 
 secrets:
   postgres_password:
@@ -119,3 +96,4 @@ secrets:
     environment: LICENSE_MANAGER_PASSWORD_SECRET
   license_signing_private_key:
     file: ./secrets/license-signing-private.pem
+
