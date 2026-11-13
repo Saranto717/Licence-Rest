@@ -2,27 +2,18 @@ name: restaurant-orders-cloud
 
 services:
   postgres:
-    image: postgres:18-alpine
+    image: postgres:18
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-restaurant_cloud}
       POSTGRES_USER: ${POSTGRES_ADMIN_USER:-restaurant_cloud_admin}
-      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
-      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
+      POSTGRES_PASSWORD
+      #POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+      #POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
       CLOUD_APP_USER: ${CLOUD_APP_USER:-restaurant_cloud_app}
-      CLOUD_APP_PASSWORD_FILE: /run/secrets/cloud_app_password
-      TZ: UTC
-    secrets:
-      - source: postgres_password
-        target: postgres_password
-        uid: "0"
-        gid: "0"
-        mode: 0400
-      - source: cloud_app_password
-        target: cloud_app_password
-        uid: "70"
-        gid: "70"
-        mode: 0400
+      CLOUD_APP_PASSWORD_FILE: ${CLOUD_APP_PASSWORD_FILE}
+      TZ: Europe/Athens
+  
     volumes:
       - ./init/001-create-app-user.sh:/docker-entrypoint-initdb.d/001-create-app-user.sh:ro
       - postgres-data:/var/lib/postgresql
@@ -47,34 +38,14 @@ services:
       Cloud__DatabaseUser: ${CLOUD_APP_USER:-restaurant_cloud_app}
       Cloud__DatabasePasswordFile: /run/secrets/cloud_app_password
       Cloud__AdminKeyFile: /run/secrets/cloud_admin_key
-      Cloud__LicenseManagerPasswordFile: /run/secrets/license_manager_password
+      Cloud__LicenseManagerPasswordFile: ${CLOUD_APP_PASSWORD_FILE}
       Cloud__LicenseSigningPrivateKeyFile: /run/secrets/license_signing_private_key
-    secrets:
-      - source: cloud_app_password
-        target: cloud_app_password
-        uid: "1654"
-        gid: "1654"
-        mode: 0400
-      - source: cloud_admin_key
-        target: cloud_admin_key
-        uid: "1654"
-        gid: "1654"
-        mode: 0400
-      - source: license_manager_password
-        target: license_manager_password
-        uid: "1654"
-        gid: "1654"
-        mode: 0400
-      - source: license_signing_private_key
-        target: license_signing_private_key
-        uid: "1654"
-        gid: "1654"
-        mode: 0400
+
     depends_on:
       postgres:
         condition: service_healthy
     ports:
-      - "${CLOUD_API_BIND_ADDRESS:-127.0.0.1}:${CLOUD_API_PORT:-8080}:8080"
+      - "${CLOUD_API_BIND_ADDRESS:-0.0.0.0}:${CLOUD_API_PORT:-18080}:8080"
     networks:
       - database
 
@@ -85,15 +56,4 @@ networks:
 volumes:
   postgres-data:
 
-secrets:
-  postgres_password:
-    environment: POSTGRES_PASSWORD_SECRET
-  cloud_app_password:
-    environment: CLOUD_APP_PASSWORD_SECRET
-  cloud_admin_key:
-    environment: CLOUD_ADMIN_KEY_SECRET
-  license_manager_password:
-    environment: LICENSE_MANAGER_PASSWORD_SECRET
-  license_signing_private_key:
-    file: ./secrets/license-signing-private.pem
 
