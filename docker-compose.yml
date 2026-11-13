@@ -2,18 +2,16 @@ name: restaurant-orders-cloud
 
 services:
   postgres:
-    image: postgres:18
+    image: postgres:18-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-restaurant_cloud}
-      POSTGRES_USER: ${POSTGRES_ADMIN_USER:-restaurant_cloud_admin}
-      POSTGRES_PASSWORD: ${POSTGRESS_PASSWORD:-service123#}
-      #POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
-      #POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
-      CLOUD_APP_USER: ${CLOUD_APP_USER:-restaurant_cloud_app}
-      CLOUD_APP_PASSWORD_FILE: ${CLOUD_APP_PASSWORD_FILE:-service123#}
-      TZ: Europe/Athens
-  
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in Dockhand}
+      POSTGRES_USER: ${POSTGRES_ADMIN_USER:?Set POSTGRES_ADMIN_USER in Dockhand}
+      POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD:?Set POSTGRES_ADMIN_PASSWORD in Dockhand}
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
+      CLOUD_APP_USER: ${CLOUD_APP_USER:?Set CLOUD_APP_USER in Dockhand}
+      CLOUD_APP_PASSWORD: ${CLOUD_APP_PASSWORD:?Set CLOUD_APP_PASSWORD in Dockhand}
+      TZ: UTC
     volumes:
       - ./init/001-create-app-user.sh:/docker-entrypoint-initdb.d/001-create-app-user.sh:ro
       - postgres-data:/var/lib/postgresql
@@ -27,25 +25,25 @@ services:
       start_period: 15s
 
   cloud-api:
-    image: ghcr.io/saranto717/restaurantorders-cloud-api:${CLOUD_IMAGE_TAG:-latest}
+    image: ghcr.io/saranto717/restaurantorders-cloud-api:latest
+    pull_policy: always
     restart: unless-stopped
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_HTTP_PORTS: "8080"
       Cloud__DatabaseHost: postgres
       Cloud__DatabasePort: "5432"
-      Cloud__DatabaseName: ${POSTGRES_DB:-restaurant_cloud}
-      Cloud__DatabaseUser: ${CLOUD_APP_USER:-restaurant_cloud_app}
-      Cloud__DatabasePasswordFile: ${CLOUD_APP_PASSWORD_FILE:-service123#}
-      Cloud__AdminKeyFile: /run/secrets/cloud_admin_key
-      Cloud__LicenseManagerPasswordFile: ${CLOUD_APP_PASSWORD_FILE}
-      Cloud__LicenseSigningPrivateKeyFile: /run/secrets/license_signing_private_key
-
+      Cloud__DatabaseName: ${POSTGRES_DB:?Set POSTGRES_DB in Dockhand}
+      Cloud__DatabaseUser: ${CLOUD_APP_USER:?Set CLOUD_APP_USER in Dockhand}
+      Cloud__DatabasePassword: ${CLOUD_APP_PASSWORD:?Set CLOUD_APP_PASSWORD in Dockhand}
+      Cloud__AdminKey: ${CLOUD_ADMIN_KEY:?Set CLOUD_ADMIN_KEY in Dockhand}
+      Cloud__LicenseManagerPassword: ${LICENSE_MANAGER_PASSWORD:?Set LICENSE_MANAGER_PASSWORD in Dockhand}
+      Cloud__LicenseSigningPrivateKeyBase64: ${LICENSE_SIGNING_PRIVATE_KEY_B64:?Set LICENSE_SIGNING_PRIVATE_KEY_B64 in Dockhand}
     depends_on:
       postgres:
         condition: service_healthy
     ports:
-      - "${CLOUD_API_BIND_ADDRESS:-0.0.0.0}:${CLOUD_API_PORT:-18080}:8080"
+      - "${CLOUD_API_BIND_ADDRESS:-127.0.0.1}:${CLOUD_API_PORT:-8080}:8080"
     networks:
       - database
 
@@ -55,5 +53,3 @@ networks:
 
 volumes:
   postgres-data:
-
-
