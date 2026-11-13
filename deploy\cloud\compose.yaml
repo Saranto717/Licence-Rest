@@ -1,0 +1,121 @@
+name: restaurant-orders-cloud
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-restaurant_cloud}
+      POSTGRES_USER: ${POSTGRES_ADMIN_USER:-restaurant_cloud_admin}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
+      CLOUD_APP_USER: ${CLOUD_APP_USER:-restaurant_cloud_app}
+      CLOUD_APP_PASSWORD_FILE: /run/secrets/cloud_app_password
+      TZ: UTC
+    secrets:
+      - source: postgres_password
+        target: postgres_password
+        uid: "0"
+        gid: "0"
+        mode: 0400
+      - source: cloud_app_password
+        target: cloud_app_password
+        uid: "70"
+        gid: "70"
+        mode: 0400
+    volumes:
+      - ./init/001-create-app-user.sh:/docker-entrypoint-initdb.d/001-create-app-user.sh:ro
+      - postgres-data:/var/lib/postgresql
+    networks:
+      - database
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 15s
+
+  cloud-api:
+    image: ${CLOUD_API_IMAGE:?Set CLOUD_API_IMAGE in .env}
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_HTTP_PORTS: "8080"
+      Cloud__DatabaseHost: postgres
+      Cloud__DatabasePort: "5432"
+      Cloud__DatabaseName: ${POSTGRES_DB:-restaurant_cloud}
+      Cloud__DatabaseUser: ${CLOUD_APP_USER:-restaurant_cloud_app}
+      Cloud__DatabasePasswordFile: /run/secrets/cloud_app_password
+      Cloud__AdminKeyFile: /run/secrets/cloud_admin_key
+      Cloud__LicenseManagerPasswordFile: /run/secrets/license_manager_password
+      Cloud__LicenseSigningPrivateKeyFile: /run/secrets/license_signing_private_key
+    secrets:
+      - source: cloud_app_password
+        target: cloud_app_password
+        uid: "1654"
+        gid: "1654"
+        mode: 0400
+      - source: cloud_admin_key
+        target: cloud_admin_key
+        uid: "1654"
+        gid: "1654"
+        mode: 0400
+      - source: license_manager_password
+        target: license_manager_password
+        uid: "1654"
+        gid: "1654"
+        mode: 0400
+      - source: license_signing_private_key
+        target: license_signing_private_key
+        uid: "1654"
+        gid: "1654"
+        mode: 0400
+    depends_on:
+      postgres:
+        condition: service_healthy
+    expose:
+      - "8080"
+    networks:
+      - edge
+      - database
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      CLOUD_IP: ${CLOUD_IP:?Set CLOUD_IP in .env}
+      ACME_EMAIL: ${ACME_EMAIL:?Set ACME_EMAIL in .env}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - cloud-api
+    networks:
+      - edge
+
+networks:
+  edge:
+  database:
+    internal: true
+
+volumes:
+  postgres-data:
+  caddy-data:
+  caddy-config:
+
+secrets:
+  postgres_password:
+    environment: POSTGRES_PASSWORD_SECRET
+  cloud_app_password:
+    environment: CLOUD_APP_PASSWORD_SECRET
+  cloud_admin_key:
+    environment: CLOUD_ADMIN_KEY_SECRET
+  license_manager_password:
+    environment: LICENSE_MANAGER_PASSWORD_SECRET
+  license_signing_private_key:
+    file: ./secrets/license-signing-private.pem

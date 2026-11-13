@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="el">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RestaurantOrders · License Manager</title>
+  <style>
+    :root { color-scheme: light; font-family: Segoe UI, Arial, sans-serif; color: #172b4d; background: #eef3f9; }
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    header { padding: 22px clamp(16px, 4vw, 48px); background: #102b50; color: white; }
+    header h1 { margin: 0; font-size: clamp(1.3rem, 3vw, 1.9rem); }
+    header p { margin: 6px 0 0; color: #d8e5f5; }
+    main { width: min(1320px, calc(100% - 28px)); margin: 22px auto; }
+    .card { margin: 14px 0; padding: 18px; border: 1px solid #d9e2ee; border-radius: 15px; background: white; box-shadow: 0 5px 18px #19385b0d; }
+    h2 { margin: 0 0 13px; font-size: 1.1rem; }
+    .login, .form-grid { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; }
+    label { display: grid; gap: 5px; min-width: 150px; color: #52647d; font-size: .84rem; font-weight: 700; }
+    input, select { min-height: 40px; width: 100%; padding: 8px 10px; border: 1px solid #cbd6e4; border-radius: 8px; background: white; color: #152640; font: inherit; }
+    button { min-height: 40px; padding: 8px 13px; border: 1px solid #294c7d; border-radius: 9px; background: #183d6b; color: white; font: inherit; font-weight: 750; cursor: pointer; }
+    button.secondary { border-color: #cbd6e4; background: #f5f8fc; color: #263b59; }
+    button.danger { border-color: #bb3428; background: #b42318; }
+    button:disabled { opacity: .55; cursor: wait; }
+    .field-name { flex: 1 1 240px; }
+    .field-vat { flex: 0 1 150px; }
+    .field-date { flex: 0 1 180px; }
+    .field-limit { flex: 0 1 150px; }
+    #licenses, #installations { display: grid; gap: 10px; }
+    .license, .installation { padding: 14px; border: 1px solid #dce5f0; border-radius: 12px; background: #fbfdff; }
+    .license-top, .installation-top { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: start; gap: 10px; }
+    .license-top strong, .installation-top strong { display: block; font-size: 1rem; }
+    .muted { color: #6a7890; font-size: .84rem; line-height: 1.5; overflow-wrap: anywhere; }
+    .pill { display: inline-block; margin-top: 4px; padding: 4px 9px; border-radius: 999px; background: #e6f6ea; color: #176b35; font-size: .76rem; font-weight: 800; }
+    .pill.off { background: #fff0ef; color: #a5281c; }
+    .row-actions { display: flex; align-items: end; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    .row-actions label { flex: 0 1 210px; }
+    .status { min-height: 24px; margin: 10px 0 0; color: #52647d; }
+    .status.error { color: #b42318; }
+    .empty { padding: 15px; border-radius: 10px; background: #f5f8fc; color: #68768c; }
+    .hint { margin: 7px 0 0; color: #64748b; font-size: .85rem; }
+    @media (max-width: 620px) { main { width: calc(100% - 18px); margin: 10px auto; } .card { padding: 13px; } label { flex: 1 1 100%; } .row-actions label { flex: 1 1 100%; } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🔐 RestaurantOrders License Manager</h1>
+    <p>Πελάτες, ενεργοποίηση εγκαταστάσεων, ανανέωση και ακύρωση αδειών.</p>
+  </header>
+  <main>
+    <section class="card">
+      <h2>Σύνδεση διαχειριστή</h2>
+      <div class="login">
+        <label style="flex:1 1 280px">Κωδικός License Manager
+          <input id="password" type="password" autocomplete="current-password" placeholder="Κωδικός από το cloud configuration">
+        </label>
+        <button id="connect">Σύνδεση / Ανανέωση</button>
+      </div>
+      <p id="status" class="status" role="status"></p>
+    </section>
+
+    <section id="workspace" hidden>
+      <section class="card">
+        <h2>Νέα άδεια πελάτη</h2>
+        <form id="create-license" class="form-grid">
+          <label class="field-name">Επωνυμία καταστήματος<input name="customerName" maxlength="160" required></label>
+          <label class="field-vat">ΑΦΜ<input name="vatNumber" maxlength="32"></label>
+          <label class="field-date">Λήξη (κενό = μόνιμη)<input name="expiresAt" type="date"></label>
+          <label class="field-limit">Εγκαταστάσεις<input name="maxInstallations" type="number" min="1" max="100" value="1" required></label>
+          <button type="submit">Δημιουργία άδειας</button>
+        </form>
+      </section>
+
+      <section class="card">
+        <h2>Άδειες</h2>
+        <div id="licenses"><div class="empty">Δεν υπάρχουν άδειες.</div></div>
+      </section>
+
+      <section class="card">
+        <h2>Εγκαταστάσεις πελατών</h2>
+        <p class="hint">Νέα εγκατάσταση εμφανίζεται εδώ μόλις συνδεθεί στον server. Ανάθεσε μια ενεργή άδεια για να ενεργοποιηθεί απομακρυσμένα.</p>
+        <div id="installations"><div class="empty">Δεν έχουν συνδεθεί εγκαταστάσεις.</div></div>
+      </section>
+    </section>
+  </main>
+  <script>
+    let managerPassword = '';
+    const byId = id => document.getElementById(id);
+    const statusBox = byId('status');
+    function showStatus(message, error = false) { statusBox.textContent = message || ''; statusBox.className = error ? 'status error' : 'status'; }
+    function basicHeader() {
+      const bytes = new TextEncoder().encode(`manager:${managerPassword}`);
+      let binary = '';
+      for (const value of bytes) binary += String.fromCharCode(value);
+      return `Basic ${btoa(binary)}`;
+    }
+    async function api(path, method = 'GET', body) {
+      const headers = { Authorization: basicHeader() };
+      if (body !== undefined) headers['Content-Type'] = 'application/json';
+      const response = await fetch(path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), cache: 'no-store' });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || `Αποτυχία αιτήματος (${response.status}).`);
+      return data;
+    }
+    function dateText(value) { return value ? new Date(value).toLocaleDateString('el-GR') : 'Μόνιμη'; }
+    function dateInputValue(value) { return value ? new Date(value).toISOString().slice(0, 10) : ''; }
+    function dateToUtc(value) { return value ? new Date(`${value}T23:59:59`).toISOString() : null; }
+    function node(tag, text, className) { const el = document.createElement(tag); if (text !== undefined) el.textContent = text; if (className) el.className = className; return el; }
+
+    async function refresh() {
+      const data = await api('/api/license-manager/v1/dashboard');
+      drawLicenses(data.licenses || []);
+      drawInstallations(data.installations || [], data.licenses || []);
+      byId('workspace').hidden = false;
+      showStatus('Συνδέθηκε με τον License Manager.');
+    }
+    function drawLicenses(licenses) {
+      const root = byId('licenses'); root.replaceChildren();
+      if (!licenses.length) { root.append(node('div', 'Δεν υπάρχουν άδειες.', 'empty')); return; }
+      for (const license of licenses) {
+        const card = node('article', undefined, 'license');
+        const top = node('div', undefined, 'license-top');
+        const info = node('div');
+        info.append(node('strong', license.customerName));
+        info.append(node('div', `ΑΦΜ: ${license.vatNumber || '—'} · ${license.activeInstallations}/${license.maxInstallations} εγκαταστάσεις · Λήξη: ${dateText(license.expiresAtUtc)}`, 'muted'));
+        const expired = license.expiresAtUtc && new Date(license.expiresAtUtc) <= new Date();
+        const active = license.status === 'active' && !expired;
+        info.append(node('span', expired ? 'ΛΗΞΗ' : (license.status === 'active' ? 'ΕΝΕΡΓΗ' : 'ΑΚΥΡΩΜΕΝΗ'), `pill${active ? '' : ' off'}`));
+        top.append(info, node('code', license.id, 'muted')); card.append(top);
+        const actions = node('div', undefined, 'row-actions');
+        const expiry = node('label', undefined); expiry.append(document.createTextNode('Νέα ημερομηνία λήξης'));
+        const date = document.createElement('input'); date.type = 'date'; date.value = dateInputValue(license.expiresAtUtc); expiry.append(date);
+        const renew = node('button', 'Ανανέωση'); renew.type = 'button';
+        renew.addEventListener('click', async () => {
+          try { await api(`/api/license-manager/v1/licenses/${license.id}/renew`, 'PUT', { expiresAtUtc: dateToUtc(date.value) }); await refresh(); }
+          catch (error) { showStatus(error.message, true); }
+        });
+        actions.append(expiry, renew);
+        if (license.status !== 'revoked') {
+          const revoke = node('button', 'Ακύρωση άδειας', 'danger'); revoke.type = 'button';
+          revoke.addEventListener('click', async () => {
+            if (!confirm(`Να ακυρωθεί η άδεια του ${license.customerName};`)) return;
+            try { await api(`/api/license-manager/v1/licenses/${license.id}/revoke`, 'POST'); await refresh(); }
+            catch (error) { showStatus(error.message, true); }
+          });
+          actions.append(revoke);
+        }
+        card.append(actions); root.append(card);
+      }
+    }
+    function drawInstallations(installations, licenses) {
+      const root = byId('installations'); root.replaceChildren();
+      if (!installations.length) { root.append(node('div', 'Δεν έχουν συνδεθεί εγκαταστάσεις.', 'empty')); return; }
+      for (const installation of installations) {
+        const card = node('article', undefined, 'installation');
+        const top = node('div', undefined, 'installation-top');
+        const info = node('div');
+        info.append(node('strong', installation.machineName || 'Υπολογιστής'));
+        info.append(node('div', `ID: ${installation.installationId}`, 'muted'));
+        info.append(node('div', `Τελευταία σύνδεση: ${new Date(installation.lastSeenAtUtc).toLocaleString('el-GR')}`, 'muted'));
+        const state = installation.isAssigned ? `${installation.customerName || 'Άγνωστος πελάτης'} · ${installation.licenseStatus || ''}` : 'Αναμένει ενεργοποίηση';
+        info.append(node('span', state.toUpperCase(), `pill${installation.isAssigned && installation.licenseStatus === 'active' ? '' : ' off'}`));
+        top.append(info); card.append(top);
+        const actions = node('div', undefined, 'row-actions');
+        if (!installation.isAssigned) {
+          const label = node('label', 'Ανάθεση άδειας');
+          const select = document.createElement('select');
+          select.append(new Option('Επίλεξε ενεργή άδεια', ''));
+          for (const license of licenses.filter(item => item.status === 'active' && (!item.expiresAtUtc || new Date(item.expiresAtUtc) > new Date()) && item.activeInstallations < item.maxInstallations))
+            select.append(new Option(`${license.customerName} · ${dateText(license.expiresAtUtc)}`, license.id));
+          label.append(select);
+          const assign = node('button', 'Ενεργοποίηση'); assign.type = 'button'; assign.disabled = true;
+          select.addEventListener('change', () => { assign.disabled = !select.value; });
+          assign.addEventListener('click', async () => {
+            try { await api(`/api/license-manager/v1/installations/${installation.installationId}/assign`, 'POST', { licenseId: select.value }); await refresh(); }
+            catch (error) { showStatus(error.message, true); }
+          });
+          actions.append(label, assign);
+        } else {
+          const detach = node('button', 'Ανάκληση από αυτή τη συσκευή', 'danger'); detach.type = 'button';
+          detach.addEventListener('click', async () => {
+            if (!confirm(`Να ανακληθεί η άδεια από το ${installation.machineName};`)) return;
+            try { await api(`/api/license-manager/v1/installations/${installation.installationId}/detach`, 'POST'); await refresh(); }
+            catch (error) { showStatus(error.message, true); }
+          });
+          actions.append(detach);
+        }
+        card.append(actions); root.append(card);
+      }
+    }
+
+    byId('connect').addEventListener('click', async () => {
+      managerPassword = byId('password').value;
+      if (!managerPassword) { showStatus('Γράψε τον κωδικό License Manager.', true); return; }
+      try { await refresh(); }
+      catch (error) { managerPassword = ''; showStatus(error.message, true); }
+    });
+    byId('create-license').addEventListener('submit', async event => {
+      event.preventDefault();
+      const form = new FormData(event.currentTarget);
+      try {
+        await api('/api/license-manager/v1/licenses', 'POST', {
+          customerName: form.get('customerName'), vatNumber: form.get('vatNumber'),
+          expiresAtUtc: dateToUtc(form.get('expiresAt')), maxInstallations: Number(form.get('maxInstallations'))
+        });
+        event.currentTarget.reset(); event.currentTarget.elements.maxInstallations.value = '1'; await refresh();
+      } catch (error) { showStatus(error.message, true); }
+    });
+  </script>
+</body>
+</html>
