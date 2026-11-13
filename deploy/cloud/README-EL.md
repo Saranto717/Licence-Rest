@@ -1,12 +1,13 @@
 # Πρώτη cloud υποδομή
 
-Αυτό το stack ξεκινά το πρώτο backend του cloud: PostgreSQL 18, το cloud API και Caddy για HTTPS. Το GitHub Actions χτίζει το API image και το δημοσιεύει ιδιωτικά στο GitHub Container Registry (GHCR). Ο VPS κάνει pull από το GHCR. Η PostgreSQL δεν δημοσιεύει θύρα στο Internet. Το API δέχεται προσωρινά εγγραφές καταστημάτων και idempotent συμβάντα συγχρονισμού. Το τοπικό POS δεν στέλνει ακόμα δεδομένα· η σύνδεση του τοπικού outbox είναι το επόμενο στάδιο.
+Αυτό το stack ξεκινά το cloud backend: PostgreSQL 18 και το cloud API. Ο proxy του server τερματίζει το HTTPS και προωθεί τα αιτήματα στο API στο `http://127.0.0.1:8080`. Η θύρα του API είναι προσβάσιμη μόνο τοπικά στον VPS, ενώ η PostgreSQL δεν δημοσιεύει θύρα. Το GitHub Actions χτίζει το API image και το δημοσιεύει ιδιωτικά στο GitHub Container Registry (GHCR). Το τοπικό POS δεν στέλνει ακόμα δεδομένα· η σύνδεση του τοπικού outbox είναι το επόμενο στάδιο.
 
 ## Προϋποθέσεις
 
 - VPS Linux με Docker Engine και Docker Compose plugin.
-- Σταθερή δημόσια IPv4 διεύθυνση του VPS. Η πρόσβαση θα γίνεται απευθείας με `https://<IP>` και δεν απαιτείται domain ή DNS record.
-- Ανοιχτές εισερχόμενες θύρες TCP 80 και 443 για το Caddy. Η θύρα 5432 δεν ανοίγει στο firewall.
+- Ο proxy του IT να τρέχει στον ίδιο VPS, εκτός Docker, και να προωθεί το δημόσιο HTTPS endpoint στο `http://127.0.0.1:8080`.
+- Το δημόσιο HTTPS URL που θα χρησιμοποιεί το POS και ο License Manager. Το διαχειρίζεται ο proxy του IT.
+- Η θύρα 8080 δεν ανοίγει στο Internet. Η PostgreSQL στη θύρα 5432 επίσης δεν ανοίγει.
 - Διαθέσιμος χώρος δίσκου και ξεχωριστό σχέδιο αντιγράφων ασφαλείας εκτός του VPS.
 - Το source repository έχει ανέβει στο GitHub. Για αυτόματο deployment χρειάζονται επιπλέον SSH πρόσβαση στον VPS και οι ρυθμίσεις του workflow παρακάτω.
 
@@ -24,7 +25,7 @@
 | `VPS_SSH_PRIVATE_KEY` | Ιδιωτικό SSH key για τον παραπάνω χρήστη |
 | `VPS_KNOWN_HOSTS` | Γραμμή `known_hosts` για τον VPS, με fingerprint επιβεβαιωμένο από τον IT manager |
 
-Μην προσθέσεις το GHCR token ή το `.env` στα GitHub Secrets. Κάνε μία φορά `docker login ghcr.io` στον VPS ως ο ίδιος Linux χρήστης, με token που έχει μόνο `read:packages`. Πριν ενεργοποιήσεις το `CLOUD_DEPLOY_ENABLED`, ο φάκελος του VPS πρέπει να περιέχει το `.env` και το `secrets/license-signing-private.pem`. Το workflow αντιγράφει αυτόματα τα ενημερωμένα `compose.yaml`, `Caddyfile`, `.env.example` και το αρχείο αρχικοποίησης της βάσης.
+Μην προσθέσεις το GHCR token ή το `.env` στα GitHub Secrets. Κάνε μία φορά `docker login ghcr.io` στον VPS ως ο ίδιος Linux χρήστης, με token που έχει μόνο `read:packages`. Πριν ενεργοποιήσεις το `CLOUD_DEPLOY_ENABLED`, ο φάκελος του VPS πρέπει να περιέχει το `.env` και το `secrets/license-signing-private.pem`. Το workflow αντιγράφει αυτόματα τα ενημερωμένα `compose.yaml`, `.env.example` και το αρχείο αρχικοποίησης της βάσης. Ο IT manager πρέπει να ρυθμίσει τον proxy να προωθεί στο `127.0.0.1:8080` και να κρατά έγκυρο το HTTPS πιστοποιητικό.
 
 Το image παραμένει ιδιωτικό. Για το repository `Saranto717/Licence-Rest`, το image είναι `ghcr.io/saranto717/restaurantorders-cloud-api`. Στο `main` χρησιμοποιείται το tag `latest`, ενώ οι εκδόσεις έχουν tags όπως `v17.3.113`.
 
@@ -32,7 +33,7 @@
 
 ## Εκκίνηση
 
-1. Αντέγραψε το `.env.example` σε `.env`, βάλε τη δημόσια IPv4 στο `CLOUD_IP` και ένα email στο `ACME_EMAIL`. Το `CLOUD_API_IMAGE` είναι ήδη ρυθμισμένο για το GHCR package αυτού του repository. Πρόσθεσε τέσσερα διαφορετικά μυστικά, τουλάχιστον 32 bytes το καθένα. Σε Linux:
+1. Αντέγραψε το `.env.example` σε `.env`. Το `CLOUD_API_IMAGE` είναι ήδη ρυθμισμένο για το GHCR package αυτού του repository. Πρόσθεσε τέσσερα διαφορετικά μυστικά, τουλάχιστον 32 bytes το καθένα. Σε Linux:
 
    ```sh
    test ! -e .env || { echo ".env υπάρχει ήδη· μην το αντικαταστήσεις."; exit 1; }
@@ -43,7 +44,7 @@
    chmod 600 .env
    ```
 
-   Έπειτα, ενημέρωσε τα `CLOUD_IP` και `ACME_EMAIL` μέσα στο `.env`. Το `.env` αγνοείται από το Git· μην το στείλεις μαζί με τον source κώδικα. Το Compose περνά τα μυστικά ως προστατευμένα αρχεία μέσα μόνο στα containers που τα χρειάζονται.
+   Το `.env` αγνοείται από το Git· μην το στείλεις μαζί με τον source κώδικα. Το Compose περνά τα μυστικά ως προστατευμένα αρχεία μέσα μόνο στα containers που τα χρειάζονται.
 2. Δημιούργησε GitHub Personal Access Token (classic) με μόνο `read:packages` και δικαίωμα ανάγνωσης στο package. Συνδέσου στο GHCR από τον ίδιο Linux λογαριασμό που θα εκτελεί το Compose. Μην αποθηκεύσεις το token στο `.env` ή στο source:
 
    ```sh
@@ -60,7 +61,7 @@
    docker compose --env-file .env up -d
    ```
 
-4. Έλεγξε το `https://<CLOUD_IP>/health/ready`. Πρέπει να επιστρέψει `{"status":"ready"}`.
+4. Έλεγξε το `https://<PUBLIC-CLOUD-URL>/health/ready` μέσω του proxy. Πρέπει να επιστρέψει `{"status":"ready"}`.
 
 ## Αυτόματη ανάπτυξη έκδοσης
 
@@ -77,7 +78,7 @@ git push origin v17.3.113
 
 Πριν ξεκινήσεις το API, δημιούργησε `secrets/` και αντέγραψε σε αυτό το `license-signing-private.pem` που αντιστοιχεί στο δημόσιο κλειδί ενσωματωμένο στην έκδοση του RestaurantOrders. Στον σταθμό ανάπτυξης το αρχικό ιδιωτικό κλειδί φυλάσσεται έξω από τον πηγαίο κώδικα στο `%LOCALAPPDATA%\RestaurantOrders\LicenseSecrets\license-signing-private.pem`. Μετέφερε το κλειδί στον VPS μόνο με ασφαλή τρόπο και όρισε δικαιώματα ανάγνωσης μόνο για τον διαχειριστή και το Docker. Μην το βάλεις στο `.env`, στο zip του source ή σε Git. Το API δεν εκκινεί χωρίς αυτό το κλειδί.
 
-Το Caddy 2.10.1 ή νεότερο ζητά αυτόματα πιστοποιητικό HTTPS για την IP και το ανανεώνει. Τα πιστοποιητικά IP της Let's Encrypt είναι βραχύβια, περίπου 160 ώρες, οπότε η αυτόματη ανανέωση πρέπει να παραμένει ενεργή.
+Το cloud API ακούει σε HTTP μόνο στη θύρα `127.0.0.1:8080` του VPS. Ο proxy του IT πρέπει να τερματίζει το δημόσιο HTTPS, να προωθεί τα αιτήματα σε αυτή τη διεύθυνση και να ανανεώνει το δικό του πιστοποιητικό. Αν ο proxy τρέχει σε Docker ή σε διαφορετικό server, η δικτύωση πρέπει να προσαρμοστεί από τον IT πριν ενεργοποιηθεί το deployment.
 
 ## Προσθήκη καταστήματος
 
@@ -88,7 +89,7 @@ curl --fail-with-body \
   -H "X-Cloud-Admin-Key: $(cat secrets/cloud_admin_key)" \
   -H "Content-Type: application/json" \
   -d '{"name":"Κατάστημα Αθήνα"}' \
-  https://<CLOUD_IP>/api/admin/v1/stores
+  https://<PUBLIC-CLOUD-URL>/api/admin/v1/stores
 ```
 
 Το endpoint συγχρονισμού είναι `POST /api/sync/v1/events` με `Authorization: Bearer <apiToken>`. Δέχεται 1–100 συμβάντα ανά αποστολή. Κάθε συμβάν έχει σταθερό `eventId`, `entityType`, `entityId`, `eventType`, `schemaVersion`, `occurredAtUtc` σε UTC και αντικείμενο `payload`. Επαναποστολή του ίδιου `eventId` για το ίδιο κατάστημα δεν δημιουργεί δεύτερη εγγραφή.
@@ -97,7 +98,7 @@ curl --fail-with-body \
 
 ## License Manager
 
-Άνοιξε `https://<CLOUD_IP>/license-manager` και βάλε την τιμή `LICENSE_MANAGER_PASSWORD_SECRET` από το `.env`. Η σύνδεση χρησιμοποιεί HTTPS και ο κωδικός δεν αποθηκεύεται στη σελίδα.
+Άνοιξε `https://<PUBLIC-CLOUD-URL>/license-manager` και βάλε την τιμή `LICENSE_MANAGER_PASSWORD_SECRET` από το `.env`. Η σύνδεση χρησιμοποιεί το HTTPS του proxy και ο κωδικός δεν αποθηκεύεται στη σελίδα.
 
 Ο installer του POS ζητά την ίδια διεύθυνση HTTPS. Μετά την πρώτη σύνδεση της εγκατάστασης, αυτή εμφανίζεται ως εκκρεμής στον License Manager. Δημιούργησε άδεια, ανάθεσέ την στην εγκατάσταση για ενεργοποίηση, και από την ίδια οθόνη μπορείς να την ανανεώσεις, να την ακυρώσεις ή να αποσυνδέσεις μια συσκευή. Οι αλλαγές εφαρμόζονται στην τοπική εγκατάσταση όταν επικοινωνήσει ξανά με το cloud. Το POS ελέγχει ανά 10 λεπτά και κρατά υπογεγραμμένη τοπική άδεια για έως 30 ημέρες χωρίς Internet, ώστε να συνεχίζει να λειτουργεί σε διακοπή σύνδεσης.
 
