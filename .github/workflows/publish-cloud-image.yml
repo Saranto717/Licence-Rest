@@ -23,6 +23,18 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Validate Dockhand Compose configuration
+        env:
+          POSTGRES_DB: ci_restaurant
+          POSTGRES_ADMIN_USER: ci_admin
+          POSTGRES_ADMIN_PASSWORD: ci-placeholder-admin-password
+          CLOUD_APP_USER: ci_app
+          CLOUD_APP_PASSWORD: ci-placeholder-app-password
+          CLOUD_ADMIN_KEY: ci-placeholder-admin-key
+          LICENSE_MANAGER_PASSWORD: ci-placeholder-manager-password
+          LICENSE_SIGNING_PRIVATE_KEY_B64: Y2ktcGxhY2Vob2xkZXI=
+        run: docker compose config --quiet
+
       - name: Build image without publishing
         uses: docker/build-push-action@v6
         with:
