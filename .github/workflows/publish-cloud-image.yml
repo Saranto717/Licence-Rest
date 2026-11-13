@@ -137,7 +137,7 @@ jobs:
           ssh -i "$HOME/.ssh/deploy_key" -o BatchMode=yes -o StrictHostKeyChecking=yes "$target" \
             "mkdir -p '$VPS_DEPLOY_DIR/init' '$VPS_DEPLOY_DIR/secrets'"
           scp -i "$HOME/.ssh/deploy_key" -o BatchMode=yes -o StrictHostKeyChecking=yes \
-            deploy/cloud/compose.yaml deploy/cloud/Caddyfile deploy/cloud/.env.example "$target:$VPS_DEPLOY_DIR/"
+            deploy/cloud/compose.yaml deploy/cloud/.env.example "$target:$VPS_DEPLOY_DIR/"
           scp -i "$HOME/.ssh/deploy_key" -o BatchMode=yes -o StrictHostKeyChecking=yes \
             deploy/cloud/init/001-create-app-user.sh "$target:$VPS_DEPLOY_DIR/init/"
 
