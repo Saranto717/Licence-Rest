@@ -171,7 +171,7 @@ public sealed class CloudLicenseDatabase(NpgsqlDataSource dataSource)
         }
 
         var now = DateTime.UtcNow;
-        var expiresAtUtc = currentExpiry is null
+        DateTime? expiresAtUtc = currentExpiry is null
             ? null
             : (currentExpiry.Value > now ? currentExpiry.Value : now).AddMonths(durationMonths);
         await using var command = new NpgsqlCommand("""
