@@ -12,7 +12,7 @@
 
 ## GitHub Actions και GHCR
 
-Το repository πρέπει να βρίσκεται στη ρίζα του GitHub repository, ώστε να αναγνωρίζεται το `.github/workflows/publish-cloud-image.yml`. Σε κάθε push στο `main`, το GitHub Actions χτίζει το image `:latest` και, όταν ενεργοποιηθεί η ρύθμιση deployment, το αναπτύσσει αυτόματα στον VPS. Για αριθμημένη έκδοση, κάνε push Git tag όπως `v17.3.113`: το workflow χτίζει και αναπτύσσει ακριβώς αυτή την έκδοση, αφού επιβεβαιώσει ότι το tag δείχνει σε commit του `main`. Δεν αλλάζεις την έκδοση του RestaurantOrders στο Dockerfile· το Dockerfile κρατά την έκδοση της πλατφόρμας .NET.
+Το repository πρέπει να βρίσκεται στη ρίζα του GitHub repository, ώστε να αναγνωρίζεται το `.github/workflows/publish-cloud-image.yml`. Κάθε push στο `main` χτίζει δοκιμαστικό image με tag `main` και tag commit SHA, χωρίς να αλλάζει την παραγωγική έκδοση. Για αριθμημένη έκδοση, κάνε push Git tag όπως `v17.3.113`: το workflow δημοσιεύει και τα δύο tags `v17.3.113` και `latest`, και όταν ενεργοποιηθεί το deployment αναπτύσσει αυτόματα το `latest` στον VPS. Έτσι το `latest` δείχνει πάντα στην πιο πρόσφατη έκδοση που προώθησες. Το workflow επιβεβαιώνει ότι το tag δείχνει σε commit του `main`. Δεν αλλάζεις την έκδοση του RestaurantOrders στο Dockerfile· το Dockerfile κρατά την έκδοση της πλατφόρμας .NET.
 
 Το workflow χρησιμοποιεί το προσωρινό `GITHUB_TOKEN` με `packages: write` για να δημοσιεύει το image· δεν χρειάζεται publish token στο repository. Για να επιτρέψεις αυτόματο deployment, άνοιξε `Settings → Secrets and variables → Actions` στο repository και πρόσθεσε το repository variable `CLOUD_DEPLOY_ENABLED` με τιμή `true`, καθώς και τα ακόλουθα repository secrets:
 
@@ -64,14 +64,14 @@
 
 ## Αυτόματη ανάπτυξη έκδοσης
 
-Μετά την αρχική εγκατάσταση και τη ρύθμιση των GitHub Secrets, κάθε push στο `main` χτίζει και αναπτύσσει το `latest`. Για αριθμημένη έκδοση, πρόσθεσε Git tag στη μορφή `vΑ.Β.Γ` σε commit του `main` και κάνε push το tag:
+Μετά την αρχική εγκατάσταση και τη ρύθμιση των GitHub Secrets, κάθε push έκδοσης με tag στη μορφή `vΑ.Β.Γ` ενημερώνει το `latest` και αναπτύσσει αυτόματα τη νέα έκδοση. Τα απλά pushes στο `main` χτίζουν δοκιμαστικό image χωρίς να αλλάζουν την παραγωγή. Για να κυκλοφορήσεις έκδοση, πρόσθεσε Git tag σε commit του `main` και κάνε push το tag:
 
 ```sh
 git tag v17.3.113
 git push origin v17.3.113
 ```
 
-Το Actions χτίζει image `ghcr.io/saranto717/restaurantorders-cloud-api:v17.3.113`, αντιγράφει τα Compose αρχεία στον VPS και εκτελεί `docker compose pull` και `docker compose up`. Η ενημέρωση του API γίνεται χωρίς να συνδεθείς χειροκίνητα στον VPS. Το Dockerfile δεν αλλάζει για κάθε έκδοση εφαρμογής.
+Το Actions χτίζει τα images `ghcr.io/saranto717/restaurantorders-cloud-api:v17.3.113` και `ghcr.io/saranto717/restaurantorders-cloud-api:latest`, αντιγράφει τα Compose αρχεία στον VPS και εκτελεί pull του `latest` και `docker compose up`. Η ενημέρωση του API γίνεται χωρίς να συνδεθείς χειροκίνητα στον VPS. Το Dockerfile δεν αλλάζει για κάθε έκδοση εφαρμογής. Αν το `CLOUD_DEPLOY_ENABLED` δεν είναι `true`, το image δημοσιεύεται αλλά το deployment παραλείπεται.
 
 Η βάση αποθηκεύεται στο named volume `postgres-data`, στο `/var/lib/postgresql` που χρησιμοποιεί η επίσημη εικόνα PostgreSQL 18. Τα named volumes επιβιώνουν από αναδημιουργία container, αλλά χρειάζονται και εξωτερικά backups. Ο λογαριασμός `POSTGRES_ADMIN_USER` χρησιμοποιείται μόνο στην αρχικοποίηση και στους ελέγχους διαχείρισης. Το API συνδέεται με ξεχωριστό `CLOUD_APP_USER`, που έχει δικαιώματα μόνο στη βάση εφαρμογής.
 
