@@ -16,3 +16,4 @@ GRANT USAGE, CREATE ON SCHEMA public TO :"app_user";
 SQL
 
 unset app_password
+

@@ -17,7 +17,6 @@ jobs:
     name: Build and publish image
     runs-on: ubuntu-latest
     outputs:
-      image_name: ${{ steps.image.outputs.name }}
       image_tag: ${{ steps.version.outputs.tag }}
     steps:
       - name: Checkout source
@@ -79,7 +78,8 @@ jobs:
       - name: Build and publish image
         uses: docker/build-push-action@v6
         with:
-          context: ./cloud/RestaurantOrders.Cloud.Api
+          context: .
+          file: ./Dockerfile
           platforms: linux/amd64
           push: true
           tags: ${{ steps.metadata.outputs.tags }}
@@ -102,7 +102,6 @@ jobs:
       VPS_DEPLOY_DIR: ${{ secrets.VPS_DEPLOY_DIR }}
       VPS_SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
       VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
-      IMAGE_NAME: ${{ needs.publish.outputs.image_name }}
       RELEASE_TAG: ${{ needs.publish.outputs.image_tag }}
     steps:
       - name: Checkout deployment files
@@ -137,25 +136,23 @@ jobs:
           ssh -i "$HOME/.ssh/deploy_key" -o BatchMode=yes -o StrictHostKeyChecking=yes "$target" \
             "mkdir -p '$VPS_DEPLOY_DIR/init' '$VPS_DEPLOY_DIR/secrets'"
           scp -i "$HOME/.ssh/deploy_key" -o BatchMode=yes -o StrictHostKeyChecking=yes \
-            deploy/cloud/compose.yaml deploy/cloud/.env.example "$target:$VPS_DEPLOY_DIR/"
+            docker-compose.yml .env.example "$target:$VPS_DEPLOY_DIR/"
           scp -i "$HOME/.ssh/deploy_key" -o BatchMode=yes -o StrictHostKeyChecking=yes \
-            deploy/cloud/init/001-create-app-user.sh "$target:$VPS_DEPLOY_DIR/init/"
+            init/001-create-app-user.sh "$target:$VPS_DEPLOY_DIR/init/"
 
       - name: Pull and restart the released version
         shell: bash
         run: |
           target="${VPS_USER}@${VPS_HOST}"
-          image_ref="${IMAGE_NAME}:latest"
-          echo "Deploying ${image_ref} from release ${RELEASE_TAG}."
+          echo "Deploying latest from release ${RELEASE_TAG}."
           ssh -i "$HOME/.ssh/deploy_key" -o BatchMode=yes -o StrictHostKeyChecking=yes "$target" \
-            "bash -se -- '$VPS_DEPLOY_DIR' '$image_ref'" <<'REMOTE'
+            "bash -se -- '$VPS_DEPLOY_DIR'" <<'REMOTE'
           set -euo pipefail
           deploy_dir="$1"
-          image_ref="$2"
           cd "$deploy_dir"
           test -f .env || { echo "Missing VPS .env file." >&2; exit 1; }
           test -s secrets/license-signing-private.pem || { echo "Missing license signing key on VPS." >&2; exit 1; }
-          export CLOUD_API_IMAGE="$image_ref"
+          export CLOUD_IMAGE_TAG=latest
           docker compose --env-file .env config --quiet
           docker compose --env-file .env pull cloud-api
           docker compose --env-file .env up -d --remove-orphans

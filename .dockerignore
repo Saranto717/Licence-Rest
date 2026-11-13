@@ -1,0 +1,16 @@
+.git
+.github
+deploy
+artifacts
+tests
+android-client
+server
+*.zip
+*.db
+**/bin
+**/obj
+.env
+**/.env
+secrets
+**/secrets
+

@@ -36,7 +36,7 @@ services:
       start_period: 15s
 
   cloud-api:
-    image: ${CLOUD_API_IMAGE:?Set CLOUD_API_IMAGE in .env}
+    image: ghcr.io/saranto717/restaurantorders-cloud-api:${CLOUD_IMAGE_TAG:-latest}
     restart: unless-stopped
     environment:
       ASPNETCORE_ENVIRONMENT: Production
@@ -74,7 +74,7 @@ services:
       postgres:
         condition: service_healthy
     ports:
-      - "127.0.0.1:8080:8080"
+      - "${CLOUD_API_BIND_ADDRESS:-127.0.0.1}:${CLOUD_API_PORT:-8080}:8080"
     networks:
       - database
 
