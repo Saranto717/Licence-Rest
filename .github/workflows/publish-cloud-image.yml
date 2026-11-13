@@ -1,33 +1,58 @@
-name: Build and deploy cloud API
+name: Cloud image CI and release
 
 on:
+  pull_request:
+    branches: [main]
   push:
-    branches:
-      - main
-    tags:
-      - 'v*'
+    branches: [main]
+    tags: ['v*']
   workflow_dispatch:
 
 permissions:
   contents: read
-  packages: write
 
 jobs:
-  publish:
-    name: Build and publish image
+  pull-request-build:
+    name: Build Docker image (pull request)
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    outputs:
-      image_tag: ${{ steps.version.outputs.tag }}
     steps:
-      - name: Checkout source
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image without publishing
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64
+          push: false
+          cache-from: type=gha
+
+  publish-image:
+    name: Build and publish GHCR image
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Check out source
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Verify release tag is on main
+      - name: Validate version tag
         if: github.ref_type == 'tag'
         shell: bash
         run: |
+          if [[ ! "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Use a stable version tag such as v1.0.2." >&2
+            exit 1
+          fi
           git fetch origin main:refs/remotes/origin/main
           git merge-base --is-ancestor "$GITHUB_SHA" refs/remotes/origin/main || {
             echo "Release tags must point to a commit on main." >&2
@@ -41,21 +66,6 @@ jobs:
         id: image
         shell: bash
         run: echo "name=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/restaurantorders-cloud-api" >> "$GITHUB_OUTPUT"
-
-      - name: Select image version
-        id: version
-        shell: bash
-        run: |
-          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
-            if [[ ! "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
-              echo "Release tag must look like v17.3.113." >&2
-              exit 1
-            fi
-            image_tag="$GITHUB_REF_NAME"
-          else
-            image_tag="latest"
-          fi
-          echo "tag=$image_tag" >> "$GITHUB_OUTPUT"
 
       - name: Sign in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -72,7 +82,7 @@ jobs:
           tags: |
             type=ref,event=branch
             type=ref,event=tag
-            type=sha
+            type=sha,format=short,prefix=sha-
             type=raw,value=latest,enable=${{ github.ref_type == 'tag' }}
 
       - name: Build and publish image
@@ -89,73 +99,23 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  deploy:
-    name: Deploy to VPS
-    needs: publish
-    if: >-
-      vars.CLOUD_DEPLOY_ENABLED == 'true' &&
-      github.ref_type == 'tag' && startsWith(github.ref_name, 'v')
-    runs-on: ubuntu-latest
-    env:
-      VPS_HOST: ${{ secrets.VPS_HOST }}
-      VPS_USER: ${{ secrets.VPS_USER }}
-      VPS_DEPLOY_DIR: ${{ secrets.VPS_DEPLOY_DIR }}
-      VPS_SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
-      VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
-      RELEASE_TAG: ${{ needs.publish.outputs.image_tag }}
-    steps:
-      - name: Checkout deployment files
-        uses: actions/checkout@v4
-
-      - name: Validate deployment settings
+      - name: Trigger Dockhand deployment
+        if: github.ref_type == 'tag'
+        env:
+          DOCKHAND_WEBHOOK_URL: ${{ secrets.DOCKHAND_WEBHOOK_URL }}
+          DOCKHAND_WEBHOOK_SECRET: ${{ secrets.DOCKHAND_WEBHOOK_SECRET }}
         shell: bash
         run: |
-          : "${VPS_HOST:?Add the VPS_HOST repository secret}"
-          : "${VPS_USER:?Add the VPS_USER repository secret}"
-          : "${VPS_DEPLOY_DIR:?Add the VPS_DEPLOY_DIR repository secret}"
-          : "${VPS_SSH_PRIVATE_KEY:?Add the VPS_SSH_PRIVATE_KEY repository secret}"
-          : "${VPS_KNOWN_HOSTS:?Add the VPS_KNOWN_HOSTS repository secret}"
-          [[ "$VPS_HOST" =~ ^[A-Za-z0-9.-]+$ ]] || { echo "VPS_HOST must be an IPv4 address or hostname." >&2; exit 1; }
-          [[ "$VPS_USER" =~ ^[A-Za-z_][A-Za-z0-9._-]*$ ]] || { echo "VPS_USER contains unsupported characters." >&2; exit 1; }
-          [[ "$VPS_DEPLOY_DIR" =~ ^/[A-Za-z0-9_./-]+$ ]] || { echo "VPS_DEPLOY_DIR must be an absolute Linux path without spaces." >&2; exit 1; }
-          [[ "/$VPS_DEPLOY_DIR/" != *"/../"* ]] || { echo "VPS_DEPLOY_DIR cannot contain '..'." >&2; exit 1; }
-          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]] || { echo "Invalid release tag." >&2; exit 1; }
-
-      - name: Configure SSH
-        shell: bash
-        run: |
-          install -d -m 700 "$HOME/.ssh"
-          printf '%s\n' "$VPS_SSH_PRIVATE_KEY" > "$HOME/.ssh/deploy_key"
-          printf '%s\n' "$VPS_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
-          chmod 600 "$HOME/.ssh/deploy_key" "$HOME/.ssh/known_hosts"
-
-      - name: Copy Compose deployment files to VPS
-        shell: bash
-        run: |
-          target="${VPS_USER}@${VPS_HOST}"
-          ssh -i "$HOME/.ssh/deploy_key" -o BatchMode=yes -o StrictHostKeyChecking=yes "$target" \
-            "mkdir -p '$VPS_DEPLOY_DIR/init' '$VPS_DEPLOY_DIR/secrets'"
-          scp -i "$HOME/.ssh/deploy_key" -o BatchMode=yes -o StrictHostKeyChecking=yes \
-            docker-compose.yml .env.example "$target:$VPS_DEPLOY_DIR/"
-          scp -i "$HOME/.ssh/deploy_key" -o BatchMode=yes -o StrictHostKeyChecking=yes \
-            init/001-create-app-user.sh "$target:$VPS_DEPLOY_DIR/init/"
-
-      - name: Pull and restart the released version
-        shell: bash
-        run: |
-          target="${VPS_USER}@${VPS_HOST}"
-          echo "Deploying latest from release ${RELEASE_TAG}."
-          ssh -i "$HOME/.ssh/deploy_key" -o BatchMode=yes -o StrictHostKeyChecking=yes "$target" \
-            "bash -se -- '$VPS_DEPLOY_DIR'" <<'REMOTE'
-          set -euo pipefail
-          deploy_dir="$1"
-          cd "$deploy_dir"
-          test -f .env || { echo "Missing VPS .env file." >&2; exit 1; }
-          test -s secrets/license-signing-private.pem || { echo "Missing license signing key on VPS." >&2; exit 1; }
-          export CLOUD_IMAGE_TAG=latest
-          docker compose --env-file .env config --quiet
-          docker compose --env-file .env pull cloud-api
-          docker compose --env-file .env up -d --remove-orphans
-          docker compose --env-file .env ps
-          REMOTE
-
+          if [[ -z "$DOCKHAND_WEBHOOK_URL" && -z "$DOCKHAND_WEBHOOK_SECRET" ]]; then
+            echo "Dockhand webhook is not configured; image was published and can be deployed from Dockhand."
+            exit 0
+          fi
+          : "${DOCKHAND_WEBHOOK_URL:?Add the Dockhand stack webhook URL as a repository secret}"
+          : "${DOCKHAND_WEBHOOK_SECRET:?Add the Dockhand webhook secret as a repository secret}"
+          payload='{}'
+          signature="sha256=$(printf '%s' "$payload" | openssl dgst -sha256 -hmac "$DOCKHAND_WEBHOOK_SECRET" | awk '{print $NF}')"
+          curl --fail --silent --show-error --retry 3 --retry-delay 3 \
+            -X POST "$DOCKHAND_WEBHOOK_URL" \
+            -H 'Content-Type: application/json' \
+            -H "X-Hub-Signature-256: $signature" \
+            --data "$payload"
