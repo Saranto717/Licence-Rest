@@ -8,13 +8,25 @@
 - Σταθερή δημόσια IPv4 διεύθυνση του VPS. Η πρόσβαση θα γίνεται απευθείας με `https://<IP>` και δεν απαιτείται domain ή DNS record.
 - Ανοιχτές εισερχόμενες θύρες TCP 80 και 443 για το Caddy. Η θύρα 5432 δεν ανοίγει στο firewall.
 - Διαθέσιμος χώρος δίσκου και ξεχωριστό σχέδιο αντιγράφων ασφαλείας εκτός του VPS.
-- Το source repository έχει ανέβει στο GitHub και έχει εκτελεστεί επιτυχώς το workflow `Publish cloud API image`.
+- Το source repository έχει ανέβει στο GitHub. Για αυτόματο deployment χρειάζονται επιπλέον SSH πρόσβαση στον VPS και οι ρυθμίσεις του workflow παρακάτω.
 
 ## GitHub Actions και GHCR
 
-Το repository πρέπει να βρίσκεται στη ρίζα του GitHub repository, ώστε να αναγνωρίζεται το `.github/workflows/publish-cloud-image.yml`. Σε push αλλαγών στο cloud API, το GitHub Actions κάνει build και δημοσιεύει το image στο GHCR. Χρησιμοποιεί το προσωρινό `GITHUB_TOKEN` του workflow με `packages: write`· δεν χρειάζεται publish token μέσα στον κώδικα.
+Το repository πρέπει να βρίσκεται στη ρίζα του GitHub repository, ώστε να αναγνωρίζεται το `.github/workflows/publish-cloud-image.yml`. Σε κάθε push στο `main`, το GitHub Actions χτίζει το image `:latest` και, όταν ενεργοποιηθεί η ρύθμιση deployment, το αναπτύσσει αυτόματα στον VPS. Για αριθμημένη έκδοση, κάνε push Git tag όπως `v17.3.113`: το workflow χτίζει και αναπτύσσει ακριβώς αυτή την έκδοση, αφού επιβεβαιώσει ότι το tag δείχνει σε commit του `main`. Δεν αλλάζεις την έκδοση του RestaurantOrders στο Dockerfile· το Dockerfile κρατά την έκδοση της πλατφόρμας .NET.
 
-Το image παραμένει ιδιωτικό. Για το repository `Saranto717/Licence-Rest`, στο `.env` του VPS το `CLOUD_API_IMAGE` είναι `ghcr.io/saranto717/restaurantorders-cloud-api:latest`. Το Compose κάνει pull αυτό το image από το GHCR.
+Το workflow χρησιμοποιεί το προσωρινό `GITHUB_TOKEN` με `packages: write` για να δημοσιεύει το image· δεν χρειάζεται publish token στο repository. Για να επιτρέψεις αυτόματο deployment, άνοιξε `Settings → Secrets and variables → Actions` στο repository και πρόσθεσε το repository variable `CLOUD_DEPLOY_ENABLED` με τιμή `true`, καθώς και τα ακόλουθα repository secrets:
+
+| Όνομα | Τιμή |
+|---|---|
+| `VPS_HOST` | Δημόσια IP ή hostname του VPS |
+| `VPS_USER` | Linux χρήστης που μπορεί να συνδεθεί με SSH και να εκτελεί Docker Compose |
+| `VPS_DEPLOY_DIR` | Απόλυτος φάκελος, π.χ. `/opt/restaurant-orders/deploy/cloud` |
+| `VPS_SSH_PRIVATE_KEY` | Ιδιωτικό SSH key για τον παραπάνω χρήστη |
+| `VPS_KNOWN_HOSTS` | Γραμμή `known_hosts` για τον VPS, με fingerprint επιβεβαιωμένο από τον IT manager |
+
+Μην προσθέσεις το GHCR token ή το `.env` στα GitHub Secrets. Κάνε μία φορά `docker login ghcr.io` στον VPS ως ο ίδιος Linux χρήστης, με token που έχει μόνο `read:packages`. Πριν ενεργοποιήσεις το `CLOUD_DEPLOY_ENABLED`, ο φάκελος του VPS πρέπει να περιέχει το `.env` και το `secrets/license-signing-private.pem`. Το workflow αντιγράφει αυτόματα τα ενημερωμένα `compose.yaml`, `Caddyfile`, `.env.example` και το αρχείο αρχικοποίησης της βάσης.
+
+Το image παραμένει ιδιωτικό. Για το repository `Saranto717/Licence-Rest`, το image είναι `ghcr.io/saranto717/restaurantorders-cloud-api`. Στο `main` χρησιμοποιείται το tag `latest`, ενώ οι εκδόσεις έχουν tags όπως `v17.3.113`.
 
 Για να κατεβάζει ο VPS ιδιωτικό image, δημιούργησε GitHub Personal Access Token (classic) με μόνο `read:packages` και δικαίωμα ανάγνωσης στο package. Σύνδεσε το Docker μία φορά με `docker login ghcr.io --username <username> --password-stdin`. Μη βάλεις το token στο repository, στο `.env` ή σε εντολή που το αποθηκεύει στο shell history. Το Docker το κρατά στα credentials του Linux χρήστη που εκτέλεσε το login. Οι οδηγίες του GitHub για [δημοσίευση με Actions](https://docs.github.com/en/packages/managing-github-packages-using-github-actions-workflows/publishing-and-installing-a-package-with-github-actions) και [δικαιώματα GHCR](https://docs.github.com/en/packages/learn-github-packages/about-permissions-for-github-packages) περιγράφουν τα permissions και τα token scopes.
 
@@ -50,16 +62,16 @@
 
 4. Έλεγξε το `https://<CLOUD_IP>/health/ready`. Πρέπει να επιστρέψει `{"status":"ready"}`.
 
-## Δημοσίευση νέας έκδοσης
+## Αυτόματη ανάπτυξη έκδοσης
 
-Μετά από push αλλαγών στο `cloud/RestaurantOrders.Cloud.Api` στο GitHub, το workflow χτίζει αυτόματα image με tag `latest` (στο default branch) και tag commit SHA. Από SSH στον VPS, μέσα στο `deploy/cloud`, εκτέλεσε:
+Μετά την αρχική εγκατάσταση και τη ρύθμιση των GitHub Secrets, κάθε push στο `main` χτίζει και αναπτύσσει το `latest`. Για αριθμημένη έκδοση, πρόσθεσε Git tag στη μορφή `vΑ.Β.Γ` σε commit του `main` και κάνε push το tag:
 
 ```sh
-docker compose --env-file .env pull cloud-api
-docker compose --env-file .env up -d --no-deps cloud-api
+git tag v17.3.113
+git push origin v17.3.113
 ```
 
-Η σύνδεση με SSH γίνεται από εσένα προς τον VPS. Το Docker χρησιμοποιεί το αποθηκευμένο GHCR token για το pull. Για πλήρως αυτόματη ανάπτυξη μπορεί αργότερα να προστεθεί ξεχωριστό GitHub Actions SSH deploy job με περιορισμένο λογαριασμό VPS.
+Το Actions χτίζει image `ghcr.io/saranto717/restaurantorders-cloud-api:v17.3.113`, αντιγράφει τα Compose αρχεία στον VPS και εκτελεί `docker compose pull` και `docker compose up`. Η ενημέρωση του API γίνεται χωρίς να συνδεθείς χειροκίνητα στον VPS. Το Dockerfile δεν αλλάζει για κάθε έκδοση εφαρμογής.
 
 Η βάση αποθηκεύεται στο named volume `postgres-data`, στο `/var/lib/postgresql` που χρησιμοποιεί η επίσημη εικόνα PostgreSQL 18. Τα named volumes επιβιώνουν από αναδημιουργία container, αλλά χρειάζονται και εξωτερικά backups. Ο λογαριασμός `POSTGRES_ADMIN_USER` χρησιμοποιείται μόνο στην αρχικοποίηση και στους ελέγχους διαχείρισης. Το API συνδέεται με ξεχωριστό `CLOUD_APP_USER`, που έχει δικαιώματα μόνο στη βάση εφαρμογής.
 
@@ -94,3 +106,4 @@ curl --fail-with-body \
 Η τοπική εφαρμογή εξακολουθεί να χρησιμοποιεί SQLite, ώστε να παραμένει διαθέσιμη χωρίς Internet. Οι απομακρυσμένες ακυρώσεις αδειών εφαρμόζονται μόλις η εγκατάσταση συνδεθεί με τον server· καμία εντολή από το Internet δεν μπορεί να φτάσει σε υπολογιστή που είναι αποσυνδεδεμένος. Δεν έχει προστεθεί ακόμη ουρά συμβάντων στην τοπική SQLite, συγχρονισμός καταλόγου/χρηστών, οθόνη cloud αναφορών ή προώθηση απομακρυσμένων εντολών προς εκτυπωτές και παρόχους.
 
 Τα SQL migrations του API αποθηκεύονται στο `cloud/RestaurantOrders.Cloud.Api/Migrations`. Τα migrations εφαρμόζονται αυτόματα κατά την εκκίνηση του API.
+
