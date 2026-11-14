@@ -4,26 +4,26 @@
 
 - Το `Dockerfile` χτίζει την εφαρμογή License Manager και το cloud API.
 - Κάθε Pull Request προς το `main` κάνει Docker build για να ελεγχθεί ότι η εικόνα χτίζεται. Δεν δημοσιεύει εικόνα.
-- Κάθε push στο `main` δημοσιεύει δοκιμαστικές εικόνες `:main` και `:sha-...`.
-- Κάθε σταθερό GitHub tag `vMAJOR.MINOR.PATCH` χτίζει και δημοσιεύει την αντίστοιχη εικόνα (`:v1.0.2`) και το `:latest`.
-- Το `docker-compose.yml` χρησιμοποιεί το `:latest`. Με ρυθμισμένο Dockhand webhook, η νέα έκδοση γίνεται pull και deploy μετά την επιτυχία του build.
+- Κάθε push στο `main` κάνει ξανά build για έλεγχο, χωρίς δημοσίευση εικόνας.
+- Κάθε σταθερό GitHub tag `vMAJOR.MINOR.PATCH` ελέγχεται από το Actions. Αν δείχνει στο τρέχον commit του `main`, το Actions ειδοποιεί το Dockhand.
+- Το Git stack του Dockhand τραβά τα `docker-compose.yml` και `Dockerfile` από το GitHub και χτίζει τοπικά την εικόνα στον server.
 
-Για κυκλοφορία, άνοιξε **GitHub → Releases → Draft a new release**, δημιούργησε tag όπως `v1.0.2` με target το `main` και δημοσίευσε το release. Το Actions ξεκινά όταν δημιουργηθεί το tag. Δεν αλλάζεις αριθμό έκδοσης μέσα στο Dockerfile.
+Για κυκλοφορία, άνοιξε **GitHub → Releases → Draft a new release**, δημιούργησε tag όπως `v1.0.2` με target το τρέχον `main` και δημοσίευσε το release. Το Actions ελέγχει το Docker build και στέλνει webhook στο Dockhand, το οποίο τραβά τον κώδικα και κάνει build στον server. Δεν αλλάζεις αριθμό έκδοσης μέσα στο Dockerfile.
 
-Το Docker image είναι `ghcr.io/saranto717/restaurantorders-cloud-api`. Αν το GHCR package είναι private, πρόσθεσε στο Dockhand registry credential για το GHCR με δικαίωμα `read:packages`. Εναλλακτικά, άλλαξε την ορατότητα του package σε public από τις ρυθμίσεις του GitHub package.
+Η εικόνα χτίζεται τοπικά από το Dockhand με όνομα `restaurantorders-cloud-api:latest`. Δεν απαιτούνται GHCR package ή registry credentials.
 
 ## Πρώτη εγκατάσταση στο Dockhand
 
 1. Στο Dockhand δημιούργησε **Git stack** από το `https://github.com/Saranto717/Licence-Rest`, branch `main`, compose file `docker-compose.yml`.
 2. Πρόσθεσε τις μεταβλητές της ενότητας «Μεταβλητές Dockhand» παρακάτω. Σήμανε ως **Secret** τις τιμές που έχουν ένδειξη «Secret».
-3. Ρύθμισε το image pull credential αν το GHCR package είναι private και κάνε Deploy.
-4. Στις ρυθμίσεις του Git stack ενεργοποίησε **Webhook**, όρισε ένα μυστικό webhook, και ενεργοποίησε **Force redeployment** και **Re-pull images**. Αυτές οι δύο επιλογές χρειάζονται για να ξανατραβηχτεί το `:latest` όταν δεν έχει αλλάξει το compose file.
-5. Αν θέλεις αυτόματο deploy μετά από release, πρόσθεσε στο GitHub repository `Saranto717/Licence-Rest` τα Actions repository secrets:
+3. Στις ρυθμίσεις του Git stack ενεργοποίησε **Build images on deploy** και κάνε Deploy. Το Compose χρησιμοποιεί το Dockerfile του repository.
+4. Ενεργοποίησε **Webhook**, όρισε webhook secret και ενεργοποίησε **Force redeployment**. Δεν χρειάζεται το **Re-pull images** για το cloud-api, επειδή η εικόνα χτίζεται τοπικά.
+5. Για αυτόματο rebuild μετά από release, πρόσθεσε στο GitHub repository `Saranto717/Licence-Rest` τα Actions repository secrets:
 
    - `DOCKHAND_WEBHOOK_URL`: το webhook URL που εμφανίζει το Dockhand για το stack.
    - `DOCKHAND_WEBHOOK_SECRET`: το ίδιο μυστικό που έβαλες στο Dockhand.
 
-Χωρίς αυτά τα δύο Actions secrets, το image θα δημοσιεύεται κανονικά στο GHCR και μπορείς να κάνεις deploy πατώντας Deploy στο Dockhand.
+Χωρίς αυτά τα δύο Actions secrets, το release build θα αποτύχει με μήνυμα που ζητά τη ρύθμισή τους. Μπορείς να κάνεις χειροκίνητο Deploy στο Dockhand, έχοντας ενεργό το **Build images on deploy**.
 
 ## Μεταβλητές Dockhand
 
@@ -63,3 +63,4 @@ base64 -w0 license-signing-private.pem
 Άνοιξε `https://<domain>/license-manager`. Στο POS, η οθόνη άδειας εμφανίζει τον κωδικό εγκατάστασης. Συμπλήρωσε τον κωδικό, τον πελάτη και τη διάρκεια σε μήνες στον License Manager. Το POS ελέγχει αυτόματα τον server και περνά στην εφαρμογή μόλις εγκριθεί.
 
 Από τη λίστα μπορείς να αλλάξεις στοιχεία πελάτη, ημερομηνία λήξης, όριο εγκαταστάσεων και σχόλια, να ανανεώσεις για μήνες, να ανακαλέσεις ή να διαγράψεις μια άδεια. Η διαγραφή είναι λογική ώστε να διατηρείται το ιστορικό ελέγχου.
+
