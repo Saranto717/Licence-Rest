@@ -35,10 +35,7 @@ if (string.IsNullOrWhiteSpace(adminKey) || Encoding.UTF8.GetByteCount(adminKey) 
 var licenseManagerPassword = ReadConfiguredSecret(builder.Configuration, "Cloud:LicenseManagerPassword", "Cloud:LicenseManagerPasswordFile");
 if (Encoding.UTF8.GetByteCount(licenseManagerPassword) < 32)
     throw new InvalidOperationException("Cloud:LicenseManagerPassword must contain at least 32 bytes of secret material.");
-var licenseSigningPrivateKeyPath = builder.Configuration["Cloud:LicenseSigningPrivateKeyFile"];
-if (string.IsNullOrWhiteSpace(licenseSigningPrivateKeyPath) || !File.Exists(licenseSigningPrivateKeyPath))
-    throw new InvalidOperationException("Cloud:LicenseSigningPrivateKeyFile must point to the RSA private key secret file.");
-var licenseSigningPrivateKey = await File.ReadAllTextAsync(licenseSigningPrivateKeyPath);
+var licenseSigningPrivateKey = await ReadLicenseSigningPrivateKeyAsync(builder.Configuration);
 
 builder.Services.AddSingleton(_ => NpgsqlDataSource.Create(connectionString));
 builder.Services.AddSingleton<CloudDatabase>();
@@ -198,17 +195,52 @@ licenseManager.MapPost("/licenses", async (
 {
     var customerName = body?.CustomerName?.Trim();
     var vatNumber = body?.VatNumber?.Trim() ?? "";
-    if (string.IsNullOrWhiteSpace(customerName) || customerName.Length > 160 || vatNumber.Length > 32)
-        return Results.BadRequest(new { error = "Συμπλήρωσε επωνυμία έως 160 χαρακτήρες και ΑΦΜ έως 32 χαρακτήρες." });
-    if (body!.MaxInstallations is < 1 or > 100)
+    var activationCodeText = body?.ActivationCode?.Trim();
+    var comments = body?.Comments?.Trim() ?? "";
+    if (string.IsNullOrWhiteSpace(customerName) || customerName.Length > 160 || vatNumber.Length > 32 || comments.Length > 4000)
+        return Results.BadRequest(new { error = "Συμπλήρωσε επωνυμία, ΑΦΜ έως 32 και σχόλια έως 4.000 χαρακτήρες." });
+    if (body is null || body.MaxInstallations is < 1 or > 100)
+        return Results.BadRequest(new { error = "Οι επιτρεπόμενες εγκαταστάσεις πρέπει να είναι από 1 έως 100." });
+    if (body.DurationMonths is < 1 or > 120)
+        return Results.BadRequest(new { error = "Η διάρκεια πρέπει να είναι από 1 έως 120 μήνες." });
+    if (!Guid.TryParse(activationCodeText, out var activationCode) || activationCode == Guid.Empty)
+        return Results.BadRequest(new { error = "Βάλε τον έγκυρο κωδικό εγκατάστασης που εμφανίζεται στο POS." });
+
+    var expiresAtUtc = DateTime.UtcNow.AddMonths(body.DurationMonths);
+    var result = await database.CreateLicenseAsync(customerName, vatNumber, expiresAtUtc,
+        body.MaxInstallations, comments, activationCode, cancellationToken);
+    if (result.ActivationCodeAlreadyAssigned)
+        return Results.Conflict(new { error = "Αυτός ο κωδικός εγκατάστασης έχει ήδη συνδεθεί με ενεργή άδεια." });
+    return Results.Created($"/api/license-manager/v1/licenses/{result.LicenseId}", new
+    {
+        licenseId = result.LicenseId,
+        activationCode,
+        expiresAtUtc
+    });
+});
+
+licenseManager.MapPut("/licenses/{licenseId:guid}", async (
+    Guid licenseId,
+    UpdateCloudLicenseRequest? body,
+    CloudLicenseDatabase database,
+    CancellationToken cancellationToken) =>
+{
+    var customerName = body?.CustomerName?.Trim();
+    var vatNumber = body?.VatNumber?.Trim() ?? "";
+    var comments = body?.Comments?.Trim() ?? "";
+    if (string.IsNullOrWhiteSpace(customerName) || customerName.Length > 160 || vatNumber.Length > 32 || comments.Length > 4000)
+        return Results.BadRequest(new { error = "Συμπλήρωσε επωνυμία, ΑΦΜ έως 32 και σχόλια έως 4.000 χαρακτήρες." });
+    if (body is null || body.MaxInstallations is < 1 or > 100)
         return Results.BadRequest(new { error = "Οι επιτρεπόμενες εγκαταστάσεις πρέπει να είναι από 1 έως 100." });
     var expiresAtUtc = body.ExpiresAtUtc?.UtcDateTime;
     if (expiresAtUtc is not null && expiresAtUtc <= DateTime.UtcNow)
         return Results.BadRequest(new { error = "Η ημερομηνία λήξης πρέπει να είναι στο μέλλον." });
 
-    var licenseId = await database.CreateLicenseAsync(customerName, vatNumber, expiresAtUtc,
-        body.MaxInstallations, cancellationToken);
-    return Results.Created($"/api/license-manager/v1/licenses/{licenseId}", new { licenseId });
+    var updated = await database.UpdateLicenseAsync(licenseId, customerName, vatNumber,
+        expiresAtUtc, body.MaxInstallations, comments, cancellationToken);
+    return updated
+        ? Results.Ok(new { status = "updated" })
+        : Results.Conflict(new { error = "Δεν βρέθηκε η άδεια ή το όριο εγκαταστάσεων είναι μικρότερο από τις ήδη ενεργές εγκαταστάσεις." });
 });
 
 licenseManager.MapPut("/licenses/{licenseId:guid}/renew", async (
@@ -217,11 +249,19 @@ licenseManager.MapPut("/licenses/{licenseId:guid}/renew", async (
     CloudLicenseDatabase database,
     CancellationToken cancellationToken) =>
 {
-    var expiresAtUtc = body?.ExpiresAtUtc?.UtcDateTime;
-    if (expiresAtUtc is not null && expiresAtUtc <= DateTime.UtcNow)
-        return Results.BadRequest(new { error = "Η ημερομηνία λήξης πρέπει να είναι στο μέλλον." });
-    var renewed = await database.RenewLicenseAsync(licenseId, expiresAtUtc, cancellationToken);
+    if (body is null || body.DurationMonths is < 1 or > 120)
+        return Results.BadRequest(new { error = "Η ανανέωση πρέπει να είναι από 1 έως 120 μήνες." });
+    var renewed = await database.RenewLicenseAsync(licenseId, body.DurationMonths, cancellationToken);
     return renewed ? Results.Ok(new { status = "active" }) : Results.NotFound(new { error = "Δεν βρέθηκε η άδεια." });
+});
+
+licenseManager.MapDelete("/licenses/{licenseId:guid}", async (
+    Guid licenseId,
+    CloudLicenseDatabase database,
+    CancellationToken cancellationToken) =>
+{
+    var deleted = await database.DeleteLicenseAsync(licenseId, cancellationToken);
+    return deleted ? Results.Ok(new { status = "deleted" }) : Results.NotFound(new { error = "Δεν βρέθηκε η άδεια." });
 });
 
 licenseManager.MapPost("/licenses/{licenseId:guid}/revoke", async (
@@ -383,5 +423,30 @@ static string ReadConfiguredSecret(IConfiguration configuration, string directKe
     return string.IsNullOrWhiteSpace(value)
         ? throw new InvalidOperationException($"{directKey} or {fileKey} must be configured.")
         : value;
+}
+
+static async Task<string> ReadLicenseSigningPrivateKeyAsync(IConfiguration configuration)
+{
+    var encodedKey = configuration["Cloud:LicenseSigningPrivateKeyBase64"];
+    if (!string.IsNullOrWhiteSpace(encodedKey))
+    {
+        try
+        {
+            var pem = Encoding.UTF8.GetString(Convert.FromBase64String(encodedKey.Trim()));
+            if (!pem.Contains("-----BEGIN", StringComparison.Ordinal) || !pem.Contains("PRIVATE KEY-----", StringComparison.Ordinal))
+                throw new InvalidOperationException("Cloud:LicenseSigningPrivateKeyBase64 must decode to a PEM private key.");
+            return pem;
+        }
+        catch (FormatException exception)
+        {
+            throw new InvalidOperationException("Cloud:LicenseSigningPrivateKeyBase64 is not valid Base64.", exception);
+        }
+    }
+
+    var keyPath = configuration["Cloud:LicenseSigningPrivateKeyFile"];
+    if (!string.IsNullOrWhiteSpace(keyPath) && File.Exists(keyPath))
+        return await File.ReadAllTextAsync(keyPath);
+
+    throw new InvalidOperationException("Configure Cloud:LicenseSigningPrivateKeyBase64 or Cloud:LicenseSigningPrivateKeyFile.");
 }
 

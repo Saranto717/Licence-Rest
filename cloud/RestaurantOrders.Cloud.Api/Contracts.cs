@@ -43,10 +43,16 @@ public sealed class CloudLicensePayload
     public string RemoteStatus { get; set; } = "active";
     public DateTime? LeaseExpiresAtUtc { get; set; }
 }
-public sealed record CreateCloudLicenseRequest(string CustomerName, string? VatNumber, DateTimeOffset? ExpiresAtUtc, int MaxInstallations = 1);
-public sealed record RenewCloudLicenseRequest(DateTimeOffset? ExpiresAtUtc);
+public sealed record CreateCloudLicenseRequest(
+    string CustomerName, string? VatNumber, string? ActivationCode, int DurationMonths,
+    int MaxInstallations = 1, string? Comments = null);
+public sealed record UpdateCloudLicenseRequest(
+    string CustomerName, string? VatNumber, DateTimeOffset? ExpiresAtUtc,
+    int MaxInstallations, string? Comments);
+public sealed record RenewCloudLicenseRequest(int DurationMonths);
 public sealed record AssignCloudLicenseRequest(Guid LicenseId);
 public sealed record ManagedLicenseView(Guid Id, string CustomerName, string VatNumber, string Status,
-    DateTime? ExpiresAtUtc, int MaxInstallations, int ActiveInstallations, DateTime CreatedAtUtc);
+    DateTime? ExpiresAtUtc, int MaxInstallations, int ActiveInstallations, DateTime CreatedAtUtc, string Comments);
 public sealed record ManagedInstallationView(Guid InstallationId, string MachineName, DateTime FirstSeenAtUtc,
     DateTime LastSeenAtUtc, Guid? LicenseId, string? CustomerName, string? LicenseStatus, bool IsAssigned);
+public sealed record CreateLicenseResult(Guid? LicenseId, bool ActivationCodeAlreadyAssigned);
