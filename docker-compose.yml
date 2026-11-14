@@ -25,8 +25,10 @@ services:
       start_period: 15s
 
   cloud-api:
-    image: ghcr.io/saranto717/restaurantorders-cloud-api:latest
-    pull_policy: always
+    image: restaurantorders-cloud-api:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
     restart: unless-stopped
     environment:
       ASPNETCORE_ENVIRONMENT: Production
@@ -53,3 +55,4 @@ networks:
 
 volumes:
   postgres-data:
+
