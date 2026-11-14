@@ -1,4 +1,4 @@
-name: Cloud image CI and release
+name: Cloud build and Dockhand release
 
 on:
   pull_request:
@@ -12,53 +12,40 @@ permissions:
   contents: read
 
 jobs:
-  pull-request-build:
-    name: Build Docker image (pull request)
-    if: github.event_name == 'pull_request'
+  build:
+    name: Validate and build Docker image
     runs-on: ubuntu-latest
+    env:
+      POSTGRES_DB: ci_restaurant
+      POSTGRES_ADMIN_USER: ci_admin
+      POSTGRES_ADMIN_PASSWORD: ci-placeholder-admin-password
+      CLOUD_APP_USER: ci_app
+      CLOUD_APP_PASSWORD: ci-placeholder-app-password
+      CLOUD_ADMIN_KEY: ci-placeholder-admin-key
+      LICENSE_MANAGER_PASSWORD: ci-placeholder-manager-password
+      LICENSE_SIGNING_PRIVATE_KEY_B64: Y2ktcGxhY2Vob2xkZXI=
     steps:
       - name: Check out source
         uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Validate Dockhand Compose configuration
-        env:
-          POSTGRES_DB: ci_restaurant
-          POSTGRES_ADMIN_USER: ci_admin
-          POSTGRES_ADMIN_PASSWORD: ci-placeholder-admin-password
-          CLOUD_APP_USER: ci_app
-          CLOUD_APP_PASSWORD: ci-placeholder-app-password
-          CLOUD_ADMIN_KEY: ci-placeholder-admin-key
-          LICENSE_MANAGER_PASSWORD: ci-placeholder-manager-password
-          LICENSE_SIGNING_PRIVATE_KEY_B64: Y2ktcGxhY2Vob2xkZXI=
+      - name: Validate Compose configuration
         run: docker compose config --quiet
 
-      - name: Build image without publishing
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ./Dockerfile
-          platforms: linux/amd64
-          push: false
-          cache-from: type=gha
+      - name: Build the Dockerfile
+        run: docker compose build --pull cloud-api
 
-  publish-image:
-    name: Build and publish GHCR image
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+  deploy:
+    name: Deploy tagged release through Dockhand
+    if: github.event_name == 'push' && github.ref_type == 'tag'
+    needs: build
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
     steps:
-      - name: Check out source
+      - name: Check out source and tags
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Validate version tag
-        if: github.ref_type == 'tag'
+      - name: Validate release version and target
         shell: bash
         run: |
           if [[ ! "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
@@ -66,64 +53,20 @@ jobs:
             exit 1
           fi
           git fetch origin main:refs/remotes/origin/main
-          git merge-base --is-ancestor "$GITHUB_SHA" refs/remotes/origin/main || {
-            echo "Release tags must point to a commit on main." >&2
+          main_sha="$(git rev-parse refs/remotes/origin/main)"
+          if [[ "$GITHUB_SHA" != "$main_sha" ]]; then
+            echo "The release tag must point to the current main commit." >&2
             exit 1
-          }
+          fi
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Set image name
-        id: image
-        shell: bash
-        run: echo "name=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/restaurantorders-cloud-api" >> "$GITHUB_OUTPUT"
-
-      - name: Sign in to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Create image tags and labels
-        id: metadata
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ steps.image.outputs.name }}
-          tags: |
-            type=ref,event=branch
-            type=ref,event=tag
-            type=sha,format=short,prefix=sha-
-            type=raw,value=latest,enable=${{ github.ref_type == 'tag' }}
-
-      - name: Build and publish image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ./Dockerfile
-          platforms: linux/amd64
-          push: true
-          tags: ${{ steps.metadata.outputs.tags }}
-          labels: |
-            ${{ steps.metadata.outputs.labels }}
-            org.opencontainers.image.source=https://github.com/${{ github.repository }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Trigger Dockhand deployment
-        if: github.ref_type == 'tag'
+      - name: Trigger Dockhand to pull the Git stack and rebuild
         env:
           DOCKHAND_WEBHOOK_URL: ${{ secrets.DOCKHAND_WEBHOOK_URL }}
           DOCKHAND_WEBHOOK_SECRET: ${{ secrets.DOCKHAND_WEBHOOK_SECRET }}
         shell: bash
         run: |
-          if [[ -z "$DOCKHAND_WEBHOOK_URL" && -z "$DOCKHAND_WEBHOOK_SECRET" ]]; then
-            echo "Dockhand webhook is not configured; image was published and can be deployed from Dockhand."
-            exit 0
-          fi
-          : "${DOCKHAND_WEBHOOK_URL:?Add the Dockhand stack webhook URL as a repository secret}"
-          : "${DOCKHAND_WEBHOOK_SECRET:?Add the Dockhand webhook secret as a repository secret}"
+          : "${DOCKHAND_WEBHOOK_URL:?Add DOCKHAND_WEBHOOK_URL to repository Actions secrets}"
+          : "${DOCKHAND_WEBHOOK_SECRET:?Add DOCKHAND_WEBHOOK_SECRET to repository Actions secrets}"
           payload='{}'
           signature="sha256=$(printf '%s' "$payload" | openssl dgst -sha256 -hmac "$DOCKHAND_WEBHOOK_SECRET" | awk '{print $NF}')"
           curl --fail --silent --show-error --retry 3 --retry-delay 3 \
@@ -131,3 +74,4 @@ jobs:
             -H 'Content-Type: application/json' \
             -H "X-Hub-Signature-256: $signature" \
             --data "$payload"
+
