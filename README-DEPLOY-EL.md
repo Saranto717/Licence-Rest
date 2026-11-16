@@ -36,7 +36,6 @@
 | `CLOUD_APP_PASSWORD` | **Secret** | Κωδικός χρήστη εφαρμογής PostgreSQL |
 | `CLOUD_ADMIN_KEY` | **Secret** | Κλειδί για διαχείριση καταστημάτων από το API |
 | `LICENSE_MANAGER_PASSWORD` | **Secret** | Κωδικός σύνδεσης στο License Manager |
-| `LICENSE_SIGNING_PRIVATE_KEY_B64` | **Secret** | Υπάρχον ιδιωτικό RSA signing key σε Base64 |
 | `CLOUD_API_BIND_ADDRESS` | Απλή | Διεύθυνση host του API, συνήθως `127.0.0.1` για proxy στον ίδιο VPS |
 | `CLOUD_API_PORT` | Απλή | Τοπική θύρα API, προεπιλογή `8080` |
 
@@ -46,13 +45,7 @@
 openssl rand -hex 32
 ```
 
-Το `LICENSE_SIGNING_PRIVATE_KEY_B64` πρέπει να είναι το ιδιωτικό κλειδί που αντιστοιχεί στο public key που περιλαμβάνει το POS. Αν το υπάρχον `.pem` βρίσκεται στον VPS, κωδικοποίησέ το σε μία γραμμή και βάλε το αποτέλεσμα ως Secret στο Dockhand:
-
-```sh
-base64 -w0 license-signing-private.pem
-```
-
-Μην δημιουργήσεις καινούριο signing key χωρίς να προστεθεί και το αντίστοιχο public key σε έκδοση του POS. Το ιδιωτικό κλειδί δεν μπαίνει στο GitHub repository ή στο Docker image.
+Δεν χρειάζεται ιδιωτικό signing key ή επιπλέον μεταβλητή για την έκδοση αδειών. Το POS ελέγχει την άδεια μέσω HTTPS και αποθηκεύει την τελευταία θετική απάντηση για έως 30 ημέρες χωρίς σύνδεση. Μετά τις 30 ημέρες απαιτείται νέος online έλεγχος. Αν η άδεια ανακληθεί ή αλλάξει, η νέα κατάσταση εφαρμόζεται στην επόμενη επιτυχημένη σύνδεση του POS.
 
 Ο proxy πρέπει να προωθεί το HTTPS traffic στο `http://127.0.0.1:8080`. Αν τρέχει σε διαφορετικό host ή Docker network, βάλε στο `CLOUD_API_BIND_ADDRESS` διεύθυνση προσβάσιμη από τον proxy και περιόρισε την πρόσβαση με firewall. Μην εκθέσεις τη θύρα `5432` της PostgreSQL στο Internet.
 
