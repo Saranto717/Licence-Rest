@@ -8,7 +8,7 @@
 - Κάθε σταθερό GitHub tag `vMAJOR.MINOR.PATCH` ελέγχεται από το Actions. Αν δείχνει στο τρέχον commit του `main`, το Actions ειδοποιεί το Dockhand.
 - Το Git stack του Dockhand τραβά τα `docker-compose.yml` και `Dockerfile` από το GitHub και χτίζει τοπικά την εικόνα στον server.
 
-Για κυκλοφορία, άνοιξε **GitHub → Releases → Draft a new release**, δημιούργησε tag όπως `v1.0.2` με target το τρέχον `main` και δημοσίευσε το release. Το Actions ελέγχει το Docker build και στέλνει webhook στο Dockhand, το οποίο τραβά τον κώδικα και κάνει build στον server. Δεν αλλάζεις αριθμό έκδοσης μέσα στο Dockerfile.
+Για κυκλοφορία, άνοιξε **GitHub → Releases → Draft a new release**, δημιούργησε tag όπως `v1.0.3` με target το τρέχον `main` και δημοσίευσε το release. Το Actions ελέγχει το Docker build και στέλνει webhook στο Dockhand, το οποίο τραβά τον κώδικα και κάνει build στον server. Δεν αλλάζεις αριθμό έκδοσης μέσα στο Dockerfile.
 
 Η εικόνα χτίζεται τοπικά από το Dockhand με όνομα `restaurantorders-cloud-api:latest`. Δεν απαιτούνται GHCR package ή registry credentials.
 
