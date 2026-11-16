@@ -23,7 +23,6 @@ jobs:
       CLOUD_APP_PASSWORD: ci-placeholder-app-password
       CLOUD_ADMIN_KEY: ci-placeholder-admin-key
       LICENSE_MANAGER_PASSWORD: ci-placeholder-manager-password
-      LICENSE_SIGNING_PRIVATE_KEY_B64: Y2ktcGxhY2Vob2xkZXI=
     steps:
       - name: Check out source
         uses: actions/checkout@v4
