@@ -40,7 +40,6 @@ services:
       Cloud__DatabasePassword: ${CLOUD_APP_PASSWORD:?Set CLOUD_APP_PASSWORD in Dockhand}
       Cloud__AdminKey: ${CLOUD_ADMIN_KEY:?Set CLOUD_ADMIN_KEY in Dockhand}
       Cloud__LicenseManagerPassword: ${LICENSE_MANAGER_PASSWORD:?Set LICENSE_MANAGER_PASSWORD in Dockhand}
-      Cloud__LicenseSigningPrivateKeyBase64: ${LICENSE_SIGNING_PRIVATE_KEY_B64:?Set LICENSE_SIGNING_PRIVATE_KEY_B64 in Dockhand}
     depends_on:
       postgres:
         condition: service_healthy
