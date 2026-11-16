@@ -35,10 +35,7 @@ if (string.IsNullOrWhiteSpace(adminKey) || Encoding.UTF8.GetByteCount(adminKey) 
 var licenseManagerPassword = ReadConfiguredSecret(builder.Configuration, "Cloud:LicenseManagerPassword", "Cloud:LicenseManagerPasswordFile");
 if (Encoding.UTF8.GetByteCount(licenseManagerPassword) < 32)
     throw new InvalidOperationException("Cloud:LicenseManagerPassword must contain at least 32 bytes of secret material.");
-var licenseSigningPrivateKeyPath = builder.Configuration["Cloud:LicenseSigningPrivateKeyFile"];
-if (string.IsNullOrWhiteSpace(licenseSigningPrivateKeyPath) || !File.Exists(licenseSigningPrivateKeyPath))
-    throw new InvalidOperationException("Cloud:LicenseSigningPrivateKeyFile must point to the RSA private key secret file.");
-var licenseSigningPrivateKey = await File.ReadAllTextAsync(licenseSigningPrivateKeyPath);
+var licenseSigningPrivateKey = await ReadLicenseSigningPrivateKeyAsync(builder.Configuration);
 
 builder.Services.AddSingleton(_ => NpgsqlDataSource.Create(connectionString));
 builder.Services.AddSingleton<CloudDatabase>();
@@ -261,6 +258,17 @@ licenseManager.MapPost("/installations/{installationId:guid}/detach", async (
     return detached ? Results.Ok(new { status = "detached" }) : Results.NotFound(new { error = "Η εγκατάσταση δεν έχει ενεργή άδεια." });
 });
 
+licenseManager.MapPost("/installations/{installationId:guid}/rebind", async (
+    Guid installationId,
+    CloudLicenseDatabase database,
+    CancellationToken cancellationToken) =>
+{
+    var requested = await database.RequestInstallationRebindAsync(installationId, cancellationToken);
+    return requested
+        ? Results.Ok(new { status = "rebind-pending" })
+        : Results.NotFound(new { error = "Δεν βρέθηκε η εγκατάσταση." });
+});
+
 app.MapGet("/license-manager", () => Results.Redirect("/license-manager.html"));
 
 app.MapPost("/api/sync/v1/events", async (
@@ -383,5 +391,29 @@ static string ReadConfiguredSecret(IConfiguration configuration, string directKe
     return string.IsNullOrWhiteSpace(value)
         ? throw new InvalidOperationException($"{directKey} or {fileKey} must be configured.")
         : value;
+}
+
+static async Task<string> ReadLicenseSigningPrivateKeyAsync(IConfiguration configuration)
+{
+    var base64 = configuration["Cloud:LicenseSigningPrivateKeyBase64"];
+    if (!string.IsNullOrWhiteSpace(base64))
+    {
+        try
+        {
+            return Encoding.UTF8.GetString(Convert.FromBase64String(base64.Trim()));
+        }
+        catch (FormatException exception)
+        {
+            throw new InvalidOperationException(
+                "Cloud:LicenseSigningPrivateKeyBase64 must be Base64-encoded PEM, or configure Cloud:LicenseSigningPrivateKeyFile.",
+                exception);
+        }
+    }
+
+    var path = configuration["Cloud:LicenseSigningPrivateKeyFile"];
+    if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+        throw new InvalidOperationException(
+            "Configure Cloud:LicenseSigningPrivateKeyBase64 or Cloud:LicenseSigningPrivateKeyFile for the RSA private key.");
+    return await File.ReadAllTextAsync(path);
 }
 

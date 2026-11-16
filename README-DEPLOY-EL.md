@@ -23,56 +23,31 @@ git push origin v17.3.113
 
 Αν ο proxy τρέχει σε Docker ή σε διαφορετικό server, ρύθμισε πρώτα την προσβάσιμη ιδιωτική διεύθυνση του API και το firewall. Μην ανοίξεις τη θύρα 5432 της PostgreSQL στο Internet.
 
-## Αρχική εγκατάσταση στον VPS
+## Εγκατάσταση και αυτόματες ενημερώσεις με Dockhand
 
-Ο `VPS_DEPLOY_DIR` πρέπει να είναι φάκελος εγγράψιμος από τον SSH χρήστη, για παράδειγμα `/opt/restaurant-orders`. Ο φάκελος περιέχει το `.env` και τον υποφάκελο `secrets/`. Το Actions αντιγράφει εκεί τα `docker-compose.yml`, `.env.example` και το script αρχικοποίησης της βάσης σε κάθε έκδοση.
+Το GitHub Actions χτίζει εικόνα για κάθε release tag τύπου `vX.Y.Z` και ανεβάζει την ίδια έκδοση με tag `latest` στο GHCR. Το Compose χρησιμοποιεί αυτό το `latest` tag, οπότε το Dockhand μπορεί να ενημερώνει το stack χωρίς αλλαγή branch.
 
-Αντέγραψε το `.env.example` σε `.env`, κράτησε το `CLOUD_IMAGE_TAG=latest` και πρόσθεσε τέσσερα διαφορετικά μυστικά. Παράδειγμα σε Linux:
+Στο Git stack `cloud` του Dockhand:
 
-```sh
-mkdir -p /opt/restaurant-orders/secrets
-cd /opt/restaurant-orders
-curl -fsSL https://raw.githubusercontent.com/Saranto717/Licence-Rest/main/.env.example -o .env.example
-cp .env.example .env
-for key in POSTGRES_PASSWORD_SECRET CLOUD_APP_PASSWORD_SECRET CLOUD_ADMIN_KEY_SECRET LICENSE_MANAGER_PASSWORD_SECRET; do
-  printf '%s=%s\n' "$key" "$(openssl rand -hex 32)" >> .env
-done
-chmod 600 .env
-mkdir -p secrets
-```
+1. Άφησε το branch στο `main` και απενεργοποίησε το **Build images on deploy**.
+2. Ενεργοποίησε το **Enable scheduled sync** για το συγκεκριμένο stack.
+3. Στις επιλογές deploy ενεργοποίησε **Re-pull images** και **Force redeployment**. Έτσι, όταν συγχρονίζεται το ίδιο commit, το Dockhand ξανατραβά το `latest` και εφαρμόζει τη νέα εικόνα.
+4. Ρύθμισε το `CLOUD_IMAGE_TAG` σε `latest`.
+5. Αν το GHCR package είναι ιδιωτικό, πρόσθεσε τα στοιχεία ανάγνωσης του GHCR στο Dockhand Registry.
 
-Μετέφερε το `license-signing-private.pem` με ασφαλή τρόπο στον `secrets/license-signing-private.pem`. Μην βάλεις το `.env`, το ιδιωτικό κλειδί ή το GitHub token στο repository.
+Για να εκδοθεί ενημέρωση, φτιάξε GitHub Release με tag όπως `v1.0.2` από commit που υπάρχει στο `main`. Το GitHub Actions θα χτίσει και θα δημοσιεύσει τις εικόνες `v1.0.2` και `latest`. Το προγραμματισμένο sync του Dockhand θα τραβήξει το `latest` στην επόμενη εκτέλεση. Δεν αλλάζεις branch για κάθε έκδοση.
 
-Για ιδιωτικό image, δημιούργησε GitHub Personal Access Token (classic) με μόνο `read:packages`. Κάνε μία φορά σύνδεση στο GHCR από τον VPS, ως τον ίδιο Linux χρήστη που εκτελεί το Compose:
+Στο Dockhand κράτησε τα παρακάτω ως μεταβλητές/μυστικά του stack. Το `LICENSE_SIGNING_PRIVATE_KEY_B64` πρέπει να είναι Base64 ολόκληρου του υπάρχοντος RSA private-key PEM. Κράτησε το ίδιο κλειδί στις επόμενες εκδόσεις, ώστε να παραμένουν έγκυρες οι άδειες που έχουν ήδη υπογραφεί.
 
-```sh
-read -rsp "GitHub read:packages token: " GHCR_TOKEN; echo
-printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u YOUR_GITHUB_USERNAME --password-stdin
-unset GHCR_TOKEN
-```
-
-Πριν ενεργοποιήσεις το αυτόματο deployment, έλεγξε ότι υπάρχουν το `.env`, το αρχείο ιδιωτικού κλειδιού και η σύνδεση GHCR. Για την πρώτη εκκίνηση:
-
-```sh
-docker compose --env-file .env pull cloud-api
-docker compose --env-file .env up -d
-```
-
-## Ρυθμίσεις GitHub για αυτόματο deployment
-
-Στο repository `Saranto717/Licence-Rest`, άνοιξε `Settings → Secrets and variables → Actions`.
-
-Πρόσθεσε repository variable `CLOUD_DEPLOY_ENABLED` με τιμή `true` και τα παρακάτω repository secrets:
-
-| Secret | Περιεχόμενο |
-|---|---|
-| `VPS_HOST` | Δημόσια IP ή hostname του VPS |
-| `VPS_USER` | Linux SSH χρήστης με δικαίωμα εκτέλεσης Docker Compose |
-| `VPS_DEPLOY_DIR` | Απόλυτη διαδρομή του φακέλου εγκατάστασης |
-| `VPS_SSH_PRIVATE_KEY` | Ιδιωτικό κλειδί για τον SSH χρήστη |
-| `VPS_KNOWN_HOSTS` | Καταχώριση host key με fingerprint επιβεβαιωμένο από τον IT manager |
-
-Στον VPS πρέπει να έχει προστεθεί το αντίστοιχο δημόσιο SSH key στο `authorized_keys` του χρήστη. Ενεργοποίησε το `CLOUD_DEPLOY_ENABLED` μόνο αφού είναι έτοιμα τα παραπάνω και ο proxy προωθεί στο API.
+- `POSTGRES_DB`
+- `POSTGRES_ADMIN_USER`
+- `POSTGRES_ADMIN_PASSWORD`
+- `CLOUD_APP_USER`
+- `CLOUD_APP_PASSWORD`
+- `CLOUD_ADMIN_KEY`
+- `LICENSE_MANAGER_PASSWORD`
+- `LICENSE_SIGNING_PRIVATE_KEY_B64`
+- `CLOUD_IMAGE_TAG=latest`
 
 Η βάση μένει στο Docker volume `postgres-data` και διατηρείται σε αναβαθμίσεις container. Κράτα ξεχωριστά αντίγραφα ασφαλείας.
 
