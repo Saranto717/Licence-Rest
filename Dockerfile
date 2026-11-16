@@ -15,6 +15,8 @@ WORKDIR /app
 ENV ASPNETCORE_HTTP_PORTS=8080
 EXPOSE 8080
 COPY --from=build /out ./
+RUN mkdir -p /var/lib/restaurantorders/secrets \
+    && chown -R $APP_UID:$APP_UID /var/lib/restaurantorders
 USER $APP_UID
 ENTRYPOINT ["dotnet", "RestaurantOrders.Cloud.Api.dll"]
 
