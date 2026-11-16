@@ -18,7 +18,7 @@ services:
     networks:
       - database
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 6
@@ -47,10 +47,13 @@ services:
       - "${CLOUD_API_BIND_ADDRESS:-127.0.0.1}:${CLOUD_API_PORT:-8080}:8080"
     networks:
       - database
+      - api_access
 
 networks:
   database:
     internal: true
+  api_access:
+    driver: bridge
 
 volumes:
   postgres-data:
