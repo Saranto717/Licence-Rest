@@ -35,12 +35,10 @@ if (string.IsNullOrWhiteSpace(adminKey) || Encoding.UTF8.GetByteCount(adminKey) 
 var licenseManagerPassword = ReadConfiguredSecret(builder.Configuration, "Cloud:LicenseManagerPassword", "Cloud:LicenseManagerPasswordFile");
 if (Encoding.UTF8.GetByteCount(licenseManagerPassword) < 32)
     throw new InvalidOperationException("Cloud:LicenseManagerPassword must contain at least 32 bytes of secret material.");
-var licenseSigningPrivateKey = await ReadLicenseSigningPrivateKeyAsync(builder.Configuration);
 
 builder.Services.AddSingleton(_ => NpgsqlDataSource.Create(connectionString));
 builder.Services.AddSingleton<CloudDatabase>();
 builder.Services.AddSingleton<CloudLicenseDatabase>();
-builder.Services.AddSingleton(new LicenseSigner(licenseSigningPrivateKey));
 
 var app = builder.Build();
 app.UseStaticFiles();
@@ -120,7 +118,6 @@ app.MapPost("/api/admin/v1/stores/{storeId:guid}/rotate-token", async (
 app.MapPost("/api/license/v1/check", async (
     RemoteLicenseCheckRequest? body,
     CloudLicenseDatabase database,
-    LicenseSigner signer,
     CancellationToken cancellationToken) =>
 {
     if (body is null || !Guid.TryParse(body.InstallationId, out var installationId) ||
@@ -136,41 +133,33 @@ app.MapPost("/api/license/v1/check", async (
     var activation = await database.GetActivationInfoAsync(installationId, cancellationToken);
     if (activation is null)
         return Results.NotFound(new { error = "Δεν βρέθηκε η εγκατάσταση." });
+    var now = DateTime.UtcNow;
     if (activation.LicenseId is null)
         return Results.Ok(new RemoteLicenseCheckResponse
         {
             Status = "pending",
+            InstallationId = installationId.ToString("D"),
+            MachineName = machineName,
+            MacAddress = body.MacAddress,
+            ServerTimeUtc = now,
             Message = "Η εγκατάσταση καταχωρίστηκε και περιμένει ενεργοποίηση από τον License Manager."
         });
 
-    var now = DateTime.UtcNow;
-    var isActive = activation.IsAssigned && activation.Status == "active" &&
-                   (activation.ExpiresAtUtc is null || activation.ExpiresAtUtc.Value > now);
-    var status = isActive ? "active" : "revoked";
-    var leaseExpiry = isActive
-        ? (activation.ExpiresAtUtc is null || activation.ExpiresAtUtc.Value > now.AddDays(30)
-            ? now.AddDays(30)
-            : activation.ExpiresAtUtc.Value)
-        : now;
-    var payload = new CloudLicensePayload
+    var isExpired = activation.ExpiresAtUtc is not null && activation.ExpiresAtUtc.Value <= now;
+    var isActive = activation.IsAssigned && activation.Status == "active" && !isExpired;
+
+    return Results.Ok(new RemoteLicenseCheckResponse
     {
+        Status = isActive ? "active" : isExpired ? "expired" : "revoked",
         LicenseId = activation.LicenseId.Value.ToString("D"),
         CustomerName = activation.CustomerName,
         VatNumber = activation.VatNumber,
         InstallationId = installationId.ToString("D"),
         MachineName = machineName,
         MacAddress = body.MacAddress,
-        IssuedAtUtc = now,
+        ServerTimeUtc = now,
         ExpiresAtUtc = activation.ExpiresAtUtc,
-        RemoteStatus = status,
-        LeaseExpiresAtUtc = leaseExpiry
-    };
-
-    return Results.Ok(new RemoteLicenseCheckResponse
-    {
-        Status = status,
-        License = signer.Sign(payload),
-        Message = isActive ? "Η άδεια χρήσης είναι ενεργή." : "Η άδεια ανακλήθηκε ή έληξε."
+        Message = isActive ? "Η άδεια χρήσης είναι ενεργή." : isExpired ? "Η άδεια χρήσης έχει λήξει." : "Η άδεια ανακλήθηκε."
     });
 });
 
@@ -425,28 +414,4 @@ static string ReadConfiguredSecret(IConfiguration configuration, string directKe
         : value;
 }
 
-static async Task<string> ReadLicenseSigningPrivateKeyAsync(IConfiguration configuration)
-{
-    var encodedKey = configuration["Cloud:LicenseSigningPrivateKeyBase64"];
-    if (!string.IsNullOrWhiteSpace(encodedKey))
-    {
-        try
-        {
-            var pem = Encoding.UTF8.GetString(Convert.FromBase64String(encodedKey.Trim()));
-            if (!pem.Contains("-----BEGIN", StringComparison.Ordinal) || !pem.Contains("PRIVATE KEY-----", StringComparison.Ordinal))
-                throw new InvalidOperationException("Cloud:LicenseSigningPrivateKeyBase64 must decode to a PEM private key.");
-            return pem;
-        }
-        catch (FormatException exception)
-        {
-            throw new InvalidOperationException("Cloud:LicenseSigningPrivateKeyBase64 is not valid Base64.", exception);
-        }
-    }
-
-    var keyPath = configuration["Cloud:LicenseSigningPrivateKeyFile"];
-    if (!string.IsNullOrWhiteSpace(keyPath) && File.Exists(keyPath))
-        return await File.ReadAllTextAsync(keyPath);
-
-    throw new InvalidOperationException("Configure Cloud:LicenseSigningPrivateKeyBase64 or Cloud:LicenseSigningPrivateKeyFile.");
-}
 
