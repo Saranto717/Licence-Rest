@@ -46,10 +46,13 @@ services:
       - "${CLOUD_API_BIND_ADDRESS:-127.0.0.1}:${CLOUD_API_PORT:-8080}:8080"
     networks:
       - database
+      - api_public
 
 networks:
   database:
     internal: true
+  api_public:
+    driver: bridge
 
 volumes:
   postgres-data:
