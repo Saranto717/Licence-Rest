@@ -31,6 +31,27 @@ public sealed class RemoteLicenseCheckResponse
     public DateTime? ExpiresAtUtc { get; set; }
     public string? Message { get; set; }
 }
+// Compatibility DTOs only. The current API never signs or returns these types.
+// They let a stale Dockhand checkout compile if it still has the deleted LicenseSigner.cs.
+public sealed class SignedLicenseContract
+{
+    public string Payload { get; set; } = "";
+    public string Signature { get; set; } = "";
+}
+public sealed class CloudLicensePayload
+{
+    public int SchemaVersion { get; set; } = 2;
+    public string LicenseId { get; set; } = "";
+    public string CustomerName { get; set; } = "";
+    public string VatNumber { get; set; } = "";
+    public string InstallationId { get; set; } = "";
+    public string MachineName { get; set; } = "";
+    public string MacAddress { get; set; } = "";
+    public DateTime IssuedAtUtc { get; set; }
+    public DateTime? ExpiresAtUtc { get; set; }
+    public string RemoteStatus { get; set; } = "active";
+    public DateTime? LeaseExpiresAtUtc { get; set; }
+}
 public sealed record CreateCloudLicenseRequest(
     string CustomerName, string? VatNumber, string? ActivationCode, int DurationMonths,
     int MaxInstallations = 1, string? Comments = null);
