@@ -38,10 +38,13 @@ services:
       Cloud__DatabasePassword: ${CLOUD_APP_PASSWORD:?Set CLOUD_APP_PASSWORD in Dockhand}
       Cloud__AdminKey: ${CLOUD_ADMIN_KEY:?Set CLOUD_ADMIN_KEY in Dockhand}
       Cloud__LicenseManagerPassword: ${LICENSE_MANAGER_PASSWORD:?Set LICENSE_MANAGER_PASSWORD in Dockhand}
-      Cloud__LicenseSigningPrivateKeyBase64: ${LICENSE_SIGNING_PRIVATE_KEY_B64:?Set LICENSE_SIGNING_PRIVATE_KEY_B64 in Dockhand}
+      Cloud__LicenseSigningPrivateKeyFile: /var/lib/restaurantorders/secrets/license-signing-private.pem
+      Cloud__LicenseSigningPrivateKeyBase64: ${LICENSE_SIGNING_PRIVATE_KEY_B64:-}
     depends_on:
       postgres:
         condition: service_healthy
+    volumes:
+      - license-signing-key:/var/lib/restaurantorders/secrets
     ports:
       - "${CLOUD_API_BIND_ADDRESS:-127.0.0.1}:${CLOUD_API_PORT:-8080}:8080"
     networks:
@@ -53,3 +56,4 @@ networks:
 
 volumes:
   postgres-data:
+  license-signing-key:

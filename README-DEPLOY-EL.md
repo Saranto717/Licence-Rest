@@ -37,7 +37,7 @@ git push origin v17.3.113
 
 Για να εκδοθεί ενημέρωση, φτιάξε GitHub Release με tag όπως `v1.0.2` από commit που υπάρχει στο `main`. Το GitHub Actions θα χτίσει και θα δημοσιεύσει τις εικόνες `v1.0.2` και `latest`. Το προγραμματισμένο sync του Dockhand θα τραβήξει το `latest` στην επόμενη εκτέλεση. Δεν αλλάζεις branch για κάθε έκδοση.
 
-Στο Dockhand κράτησε τα παρακάτω ως μεταβλητές/μυστικά του stack. Το `LICENSE_SIGNING_PRIVATE_KEY_B64` πρέπει να είναι Base64 ολόκληρου του υπάρχοντος RSA private-key PEM. Κράτησε το ίδιο κλειδί στις επόμενες εκδόσεις, ώστε να παραμένουν έγκυρες οι άδειες που έχουν ήδη υπογραφεί.
+Στο Dockhand κράτησε τα παρακάτω ως μεταβλητές/μυστικά του stack. Το `LICENSE_SIGNING_PRIVATE_KEY_B64` χρειάζεται μόνο στην πρώτη εκκίνηση αυτής της έκδοσης: το API το αποθηκεύει στο μόνιμο Docker volume `license-signing-key` και μετά διαβάζει το κλειδί από εκεί. Όταν επιβεβαιωθεί ότι το API ξεκίνησε και το License Manager ανοίγει κανονικά, μπορείς να αφαιρέσεις το `LICENSE_SIGNING_PRIVATE_KEY_B64` από τις μεταβλητές του stack και να κάνεις redeploy. Μην διαγράψεις το volume `license-signing-key`· περιέχει το κλειδί που αντιστοιχεί στο POS.
 
 - `POSTGRES_DB`
 - `POSTGRES_ADMIN_USER`
@@ -46,7 +46,7 @@ git push origin v17.3.113
 - `CLOUD_APP_PASSWORD`
 - `CLOUD_ADMIN_KEY`
 - `LICENSE_MANAGER_PASSWORD`
-- `LICENSE_SIGNING_PRIVATE_KEY_B64`
+- `LICENSE_SIGNING_PRIVATE_KEY_B64` (μόνο για την αρχική μεταφορά· αφαιρείται μετά)
 - `CLOUD_IMAGE_TAG=latest`
 
 Η βάση μένει στο Docker volume `postgres-data` και διατηρείται σε αναβαθμίσεις container. Κράτα ξεχωριστά αντίγραφα ασφαλείας.

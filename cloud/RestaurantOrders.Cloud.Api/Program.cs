@@ -395,25 +395,58 @@ static string ReadConfiguredSecret(IConfiguration configuration, string directKe
 
 static async Task<string> ReadLicenseSigningPrivateKeyAsync(IConfiguration configuration)
 {
+    var path = configuration["Cloud:LicenseSigningPrivateKeyFile"]
+        ?? "/var/lib/restaurantorders/secrets/license-signing-private.pem";
+    if (File.Exists(path))
+        return await File.ReadAllTextAsync(path);
+
     var base64 = configuration["Cloud:LicenseSigningPrivateKeyBase64"];
-    if (!string.IsNullOrWhiteSpace(base64))
+    if (string.IsNullOrWhiteSpace(base64))
+        throw new InvalidOperationException(
+            $"The persistent license signing key was not found at '{path}'. On first start, provide LICENSE_SIGNING_PRIVATE_KEY_B64 once so it can be saved to the Docker volume.");
+
+    string privateKey;
+    try
     {
-        try
-        {
-            return Encoding.UTF8.GetString(Convert.FromBase64String(base64.Trim()));
-        }
-        catch (FormatException exception)
-        {
-            throw new InvalidOperationException(
-                "Cloud:LicenseSigningPrivateKeyBase64 must be Base64-encoded PEM, or configure Cloud:LicenseSigningPrivateKeyFile.",
-                exception);
-        }
+        privateKey = Encoding.UTF8.GetString(Convert.FromBase64String(base64.Trim()));
+    }
+    catch (FormatException exception)
+    {
+        throw new InvalidOperationException(
+            "LICENSE_SIGNING_PRIVATE_KEY_B64 must be Base64-encoded RSA private-key PEM.", exception);
     }
 
-    var path = configuration["Cloud:LicenseSigningPrivateKeyFile"];
-    if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
-        throw new InvalidOperationException(
-            "Configure Cloud:LicenseSigningPrivateKeyBase64 or Cloud:LicenseSigningPrivateKeyFile for the RSA private key.");
+    using (var rsa = RSA.Create())
+    {
+        rsa.ImportFromPem(privateKey);
+        if (rsa.KeySize < 2048)
+            throw new InvalidOperationException("The remote license signing key must be at least 2048 bits.");
+    }
+
+    var directory = Path.GetDirectoryName(path)
+        ?? throw new InvalidOperationException("The persistent license signing key path must include a directory.");
+    Directory.CreateDirectory(directory);
+    var temporaryPath = $"{path}.{Guid.NewGuid():N}.tmp";
+    try
+    {
+        await File.WriteAllTextAsync(temporaryPath, privateKey);
+        if (OperatingSystem.IsLinux())
+            File.SetUnixFileMode(temporaryPath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+
+        try
+        {
+            File.Move(temporaryPath, path);
+        }
+        catch (IOException) when (File.Exists(path))
+        {
+            // Another API instance already completed the one-time import.
+        }
+    }
+    finally
+    {
+        if (File.Exists(temporaryPath)) File.Delete(temporaryPath);
+    }
+
     return await File.ReadAllTextAsync(path);
 }
 
