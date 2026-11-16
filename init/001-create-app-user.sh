@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-app_password="$(cat "$CLOUD_APP_PASSWORD_FILE")"
+app_password="${CLOUD_APP_PASSWORD:?CLOUD_APP_PASSWORD must be set}"
 
 psql \
   --set=ON_ERROR_STOP=1 \
@@ -16,4 +16,3 @@ GRANT USAGE, CREATE ON SCHEMA public TO :"app_user";
 SQL
 
 unset app_password
-
