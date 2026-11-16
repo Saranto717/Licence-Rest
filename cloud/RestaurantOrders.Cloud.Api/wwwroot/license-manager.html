@@ -159,6 +159,8 @@
         info.append(node('div', `Τελευταία σύνδεση: ${new Date(installation.lastSeenAtUtc).toLocaleString('el-GR')}`, 'muted'));
         const state = installation.isAssigned ? `${installation.customerName || 'Άγνωστος πελάτης'} · ${installation.licenseStatus || ''}` : 'Αναμένει ενεργοποίηση';
         info.append(node('span', state.toUpperCase(), `pill${installation.isAssigned && installation.licenseStatus === 'active' ? '' : ' off'}`));
+        if (installation.rebindPending)
+          info.append(node('span', 'ΑΝΑΜΟΝΗ ΕΠΑΝΑΣΥΝΔΕΣΗΣ · πάτησε «Έλεγχος / λήψη άδειας» στο POS', 'pill off'));
         top.append(info); card.append(top);
         const actions = node('div', undefined, 'row-actions');
         if (!installation.isAssigned) {
@@ -176,6 +178,20 @@
           });
           actions.append(label, assign);
         } else {
+          if (installation.rebindPending) {
+            actions.append(node('span', 'Η άδεια διατηρείται. Ολοκλήρωσε τη σύνδεση από την ίδια συσκευή.', 'muted'));
+          } else {
+            const rebind = node('button', 'Επανασύνδεση συσκευής', 'secondary'); rebind.type = 'button';
+            rebind.addEventListener('click', async () => {
+              if (!confirm(`Να επιτραπεί στον υπολογιστή «${installation.machineName}» να ξανασυνδεθεί; Η ίδια άδεια και ο ίδιος κωδικός εγκατάστασης θα διατηρηθούν. Μετά θα πατήσεις «Έλεγχος / λήψη άδειας» στο POS.`)) return;
+              try {
+                await api(`/api/license-manager/v1/installations/${installation.installationId}/rebind`, 'POST');
+                await refresh();
+                showStatus('Έτοιμο. Στην ίδια συσκευή πάτησε τώρα «Έλεγχος / λήψη άδειας μέσω Internet» στο POS.');
+              } catch (error) { showStatus(error.message, true); }
+            });
+            actions.append(rebind);
+          }
           const detach = node('button', 'Ανάκληση από αυτή τη συσκευή', 'danger'); detach.type = 'button';
           detach.addEventListener('click', async () => {
             if (!confirm(`Να ανακληθεί η άδεια από το ${installation.machineName};`)) return;

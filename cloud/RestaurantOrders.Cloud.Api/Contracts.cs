@@ -49,4 +49,5 @@ public sealed record AssignCloudLicenseRequest(Guid LicenseId);
 public sealed record ManagedLicenseView(Guid Id, string CustomerName, string VatNumber, string Status,
     DateTime? ExpiresAtUtc, int MaxInstallations, int ActiveInstallations, DateTime CreatedAtUtc);
 public sealed record ManagedInstallationView(Guid InstallationId, string MachineName, DateTime FirstSeenAtUtc,
-    DateTime LastSeenAtUtc, Guid? LicenseId, string? CustomerName, string? LicenseStatus, bool IsAssigned);
+    DateTime LastSeenAtUtc, Guid? LicenseId, string? CustomerName, string? LicenseStatus, bool IsAssigned,
+    bool RebindPending);

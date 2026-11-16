@@ -16,15 +16,42 @@ public sealed class CloudLicenseDatabase(NpgsqlDataSource dataSource)
             INSERT INTO cloud_license_installations (installation_id, machine_name, mac_address_sha256)
             VALUES (@installation_id, @machine_name, @mac_hash)
             ON CONFLICT (installation_id) DO UPDATE
-            SET last_seen_at_utc = now()
-            WHERE cloud_license_installations.machine_name = EXCLUDED.machine_name
-              AND cloud_license_installations.mac_address_sha256 = EXCLUDED.mac_address_sha256
+            SET last_seen_at_utc = now(),
+                machine_name = EXCLUDED.machine_name,
+                mac_address_sha256 = EXCLUDED.mac_address_sha256,
+                rebind_pending = false
+            WHERE cloud_license_installations.rebind_pending = true
+               OR (cloud_license_installations.machine_name = EXCLUDED.machine_name
+                   AND cloud_license_installations.mac_address_sha256 = EXCLUDED.mac_address_sha256)
             RETURNING installation_id
             """, connection);
         command.Parameters.AddWithValue("installation_id", NpgsqlDbType.Uuid, installationId);
         command.Parameters.AddWithValue("machine_name", NpgsqlDbType.Varchar, machineName);
         command.Parameters.AddWithValue("mac_hash", NpgsqlDbType.Bytea, macHash);
         return await command.ExecuteScalarAsync(cancellationToken) is Guid;
+    }
+
+    public async Task<bool> RequestInstallationRebindAsync(Guid installationId, CancellationToken cancellationToken)
+    {
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        Guid? licenseId;
+        await using (var command = new NpgsqlCommand("""
+            UPDATE cloud_license_installations
+            SET rebind_pending = true
+            WHERE installation_id = @installation_id
+            RETURNING license_id
+            """, connection, transaction))
+        {
+            command.Parameters.AddWithValue("installation_id", NpgsqlDbType.Uuid, installationId);
+            var value = await command.ExecuteScalarAsync(cancellationToken);
+            if (value is null) return false;
+            licenseId = value is Guid id ? id : null;
+        }
+
+        await AddAuditAsync(connection, transaction, licenseId, installationId, "rebind-requested", cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return true;
     }
 
     public async Task<LicenseActivationInfo?> GetActivationInfoAsync(Guid installationId, CancellationToken cancellationToken)
@@ -195,7 +222,7 @@ public sealed class CloudLicenseDatabase(NpgsqlDataSource dataSource)
 
         await using (var command = new NpgsqlCommand("""
             SELECT i.installation_id, i.machine_name, i.first_seen_at_utc, i.last_seen_at_utc,
-                   i.license_id, l.customer_name, l.status, i.is_assigned
+                   i.license_id, l.customer_name, l.status, i.is_assigned, i.rebind_pending
             FROM cloud_license_installations i
             LEFT JOIN cloud_licenses l ON l.id = i.license_id
             ORDER BY i.is_assigned ASC, i.last_seen_at_utc DESC
@@ -206,7 +233,7 @@ public sealed class CloudLicenseDatabase(NpgsqlDataSource dataSource)
                 installations.Add(new ManagedInstallationView(reader.GetGuid(0), reader.GetString(1),
                     reader.GetDateTime(2), reader.GetDateTime(3), reader.IsDBNull(4) ? null : reader.GetGuid(4),
                     reader.IsDBNull(5) ? null : reader.GetString(5), reader.IsDBNull(6) ? null : reader.GetString(6),
-                    reader.GetBoolean(7)));
+                    reader.GetBoolean(7), reader.GetBoolean(8)));
         }
 
         return (licenses, installations);

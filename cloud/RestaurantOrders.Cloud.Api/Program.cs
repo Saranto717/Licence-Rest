@@ -261,6 +261,17 @@ licenseManager.MapPost("/installations/{installationId:guid}/detach", async (
     return detached ? Results.Ok(new { status = "detached" }) : Results.NotFound(new { error = "Η εγκατάσταση δεν έχει ενεργή άδεια." });
 });
 
+licenseManager.MapPost("/installations/{installationId:guid}/rebind", async (
+    Guid installationId,
+    CloudLicenseDatabase database,
+    CancellationToken cancellationToken) =>
+{
+    var requested = await database.RequestInstallationRebindAsync(installationId, cancellationToken);
+    return requested
+        ? Results.Ok(new { status = "rebind-pending" })
+        : Results.NotFound(new { error = "Δεν βρέθηκε η εγκατάσταση." });
+});
+
 app.MapGet("/license-manager", () => Results.Redirect("/license-manager.html"));
 
 app.MapPost("/api/sync/v1/events", async (
