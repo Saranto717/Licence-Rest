@@ -15,6 +15,8 @@ services:
     volumes:
       - ./init/001-create-app-user.sh:/docker-entrypoint-initdb.d/001-create-app-user.sh:ro
       - postgres-data:/var/lib/postgresql
+    networks:
+      - api_public
       
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
@@ -43,7 +45,7 @@ services:
       postgres:
         condition: service_healthy
     ports:
-      - "${CLOUD_API_BIND_ADDRESS:-127.0.0.1}:${CLOUD_API_PORT:-8080}:8080"
+      - ${CLOUD_API_PORT:-8080}:8080"
     networks:
       - api_public
 
