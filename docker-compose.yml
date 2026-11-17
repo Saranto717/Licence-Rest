@@ -56,3 +56,5 @@ networks:
 
 volumes:
   postgres-data:
+
+# Published cloud API release: v0.2.0
