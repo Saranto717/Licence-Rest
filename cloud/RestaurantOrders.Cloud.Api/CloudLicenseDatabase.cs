@@ -8,21 +8,48 @@ namespace RestaurantOrders.Cloud.Api;
 public sealed class CloudLicenseDatabase(NpgsqlDataSource dataSource)
 {
     public async Task<bool> RegisterInstallationAsync(
+        Guid installationId, string machineName, string macAddress, byte[] clientTokenHash, CancellationToken cancellationToken)
+    {
+        var macHash = HashMac(macAddress);
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using var command = new NpgsqlCommand("""
+            INSERT INTO cloud_license_installations (installation_id, machine_name, mac_address_sha256, client_token_sha256)
+            VALUES (@installation_id, @machine_name, @mac_hash, @client_token_hash)
+            ON CONFLICT (installation_id) DO UPDATE
+            SET last_seen_at_utc = now(),
+                machine_name = EXCLUDED.machine_name,
+                mac_address_sha256 = EXCLUDED.mac_address_sha256,
+                client_token_sha256 = EXCLUDED.client_token_sha256,
+                rebind_pending = false
+            WHERE cloud_license_installations.rebind_pending = true
+               OR (
+                   cloud_license_installations.machine_name = EXCLUDED.machine_name
+                   AND cloud_license_installations.mac_address_sha256 = EXCLUDED.mac_address_sha256
+                   AND (cloud_license_installations.client_token_sha256 IS NULL
+                        OR cloud_license_installations.client_token_sha256 = EXCLUDED.client_token_sha256)
+               )
+            RETURNING installation_id
+            """, connection);
+        command.Parameters.AddWithValue("installation_id", NpgsqlDbType.Uuid, installationId);
+        command.Parameters.AddWithValue("machine_name", NpgsqlDbType.Varchar, machineName);
+        command.Parameters.AddWithValue("mac_hash", NpgsqlDbType.Bytea, macHash);
+        command.Parameters.AddWithValue("client_token_hash", NpgsqlDbType.Bytea, clientTokenHash);
+        return await command.ExecuteScalarAsync(cancellationToken) is Guid;
+    }
+
+    public async Task<bool> RegisterLegacyInstallationAsync(
         Guid installationId, string machineName, string macAddress, CancellationToken cancellationToken)
     {
         var macHash = HashMac(macAddress);
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
         await using var command = new NpgsqlCommand("""
-            INSERT INTO cloud_license_installations (installation_id, machine_name, mac_address_sha256)
-            VALUES (@installation_id, @machine_name, @mac_hash)
-            ON CONFLICT (installation_id) DO UPDATE
-            SET last_seen_at_utc = now(),
-                machine_name = EXCLUDED.machine_name,
-                mac_address_sha256 = EXCLUDED.mac_address_sha256,
-                rebind_pending = false
-            WHERE cloud_license_installations.rebind_pending = true
-               OR (cloud_license_installations.machine_name = EXCLUDED.machine_name
-                   AND cloud_license_installations.mac_address_sha256 = EXCLUDED.mac_address_sha256)
+            UPDATE cloud_license_installations
+            SET last_seen_at_utc = now()
+            WHERE installation_id = @installation_id
+              AND client_token_sha256 IS NULL
+              AND rebind_pending = false
+              AND machine_name = @machine_name
+              AND mac_address_sha256 = @mac_hash
             RETURNING installation_id
             """, connection);
         command.Parameters.AddWithValue("installation_id", NpgsqlDbType.Uuid, installationId);

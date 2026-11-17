@@ -47,6 +47,7 @@ builder.Services.AddSingleton<LicenseManagerSessions>();
 builder.Services.AddSingleton(new LicenseSigner(licenseSigningPrivateKey));
 
 var app = builder.Build();
+app.MapGet("/", () => Results.Redirect("/license-manager.html"));
 app.UseStaticFiles(new StaticFileOptions
 {
     OnPrepareResponse = context =>
@@ -129,6 +130,7 @@ app.MapPost("/api/admin/v1/stores/{storeId:guid}/rotate-token", async (
 });
 
 app.MapPost("/api/license/v1/check", async (
+    HttpRequest request,
     RemoteLicenseCheckRequest? body,
     CloudLicenseDatabase database,
     LicenseSigner signer,
@@ -141,8 +143,13 @@ app.MapPost("/api/license/v1/check", async (
         return Results.BadRequest(new { error = "Τα στοιχεία εγκατάστασης δεν είναι έγκυρα." });
 
     var machineName = body.MachineName.Trim();
-    if (!await database.RegisterInstallationAsync(installationId, machineName, body.MacAddress, cancellationToken))
-        return Results.Conflict(new { error = "Το αναγνωριστικό εγκατάστασης έχει ήδη δεθεί με διαφορετικό υπολογιστή. Επικοινώνησε με τον προμηθευτή." });
+    var clientToken = ReadBearerToken(request.Headers.Authorization.ToString());
+    var registered = clientToken is null
+        ? await database.RegisterLegacyInstallationAsync(installationId, machineName, body.MacAddress, cancellationToken)
+        : await database.RegisterInstallationAsync(installationId, machineName, body.MacAddress,
+            SHA256.HashData(Encoding.UTF8.GetBytes(clientToken)), cancellationToken);
+    if (!registered)
+        return Results.Unauthorized();
 
     var activation = await database.GetActivationInfoAsync(installationId, cancellationToken);
     if (activation is null)
