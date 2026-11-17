@@ -25,6 +25,7 @@ public sealed class CloudLicenseDatabase(NpgsqlDataSource dataSource)
                OR (
                    cloud_license_installations.machine_name = EXCLUDED.machine_name
                    AND cloud_license_installations.mac_address_sha256 = EXCLUDED.mac_address_sha256
+                   AND cloud_license_installations.client_public_key IS NULL
                    AND (cloud_license_installations.client_token_sha256 IS NULL
                         OR cloud_license_installations.client_token_sha256 = EXCLUDED.client_token_sha256)
                )
@@ -37,25 +38,70 @@ public sealed class CloudLicenseDatabase(NpgsqlDataSource dataSource)
         return await command.ExecuteScalarAsync(cancellationToken) is Guid;
     }
 
-    public async Task<bool> RegisterLegacyInstallationAsync(
-        Guid installationId, string machineName, string macAddress, CancellationToken cancellationToken)
+    public async Task<bool> RegisterSignedInstallationRequestAsync(
+        Guid installationId,
+        string machineName,
+        string macAddress,
+        byte[] clientPublicKey,
+        byte[] nonceHash,
+        CancellationToken cancellationToken)
     {
         var macHash = HashMac(macAddress);
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
-        await using var command = new NpgsqlCommand("""
-            UPDATE cloud_license_installations
-            SET last_seen_at_utc = now()
-            WHERE installation_id = @installation_id
-              AND client_token_sha256 IS NULL
-              AND rebind_pending = false
-              AND machine_name = @machine_name
-              AND mac_address_sha256 = @mac_hash
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+
+        await using (var register = new NpgsqlCommand("""
+            INSERT INTO cloud_license_installations (
+                installation_id, machine_name, mac_address_sha256, client_token_sha256, client_public_key)
+            VALUES (@installation_id, @machine_name, @mac_hash, NULL, @client_public_key)
+            ON CONFLICT (installation_id) DO UPDATE
+            SET last_seen_at_utc = now(),
+                machine_name = EXCLUDED.machine_name,
+                mac_address_sha256 = EXCLUDED.mac_address_sha256,
+                client_token_sha256 = NULL,
+                client_public_key = EXCLUDED.client_public_key,
+                rebind_pending = false
+            WHERE cloud_license_installations.rebind_pending = true
+               OR (
+                   cloud_license_installations.machine_name = EXCLUDED.machine_name
+                   AND cloud_license_installations.mac_address_sha256 = EXCLUDED.mac_address_sha256
+                   AND (cloud_license_installations.client_public_key IS NULL
+                        OR cloud_license_installations.client_public_key = EXCLUDED.client_public_key)
+               )
             RETURNING installation_id
-            """, connection);
-        command.Parameters.AddWithValue("installation_id", NpgsqlDbType.Uuid, installationId);
-        command.Parameters.AddWithValue("machine_name", NpgsqlDbType.Varchar, machineName);
-        command.Parameters.AddWithValue("mac_hash", NpgsqlDbType.Bytea, macHash);
-        return await command.ExecuteScalarAsync(cancellationToken) is Guid;
+            """, connection, transaction))
+        {
+            register.Parameters.AddWithValue("installation_id", NpgsqlDbType.Uuid, installationId);
+            register.Parameters.AddWithValue("machine_name", NpgsqlDbType.Varchar, machineName);
+            register.Parameters.AddWithValue("mac_hash", NpgsqlDbType.Bytea, macHash);
+            register.Parameters.AddWithValue("client_public_key", NpgsqlDbType.Bytea, clientPublicKey);
+            if (await register.ExecuteScalarAsync(cancellationToken) is not Guid)
+                return false;
+        }
+
+        try
+        {
+            await using var nonce = new NpgsqlCommand("""
+                INSERT INTO cloud_license_request_nonces (installation_id, nonce_sha256)
+                VALUES (@installation_id, @nonce_hash)
+                """, connection, transaction);
+            nonce.Parameters.AddWithValue("installation_id", NpgsqlDbType.Uuid, installationId);
+            nonce.Parameters.AddWithValue("nonce_hash", NpgsqlDbType.Bytea, nonceHash);
+            await nonce.ExecuteNonQueryAsync(cancellationToken);
+        }
+        catch (PostgresException exception) when (exception.SqlState == PostgresErrorCodes.UniqueViolation)
+        {
+            return false;
+        }
+
+        await using (var cleanup = new NpgsqlCommand("""
+            DELETE FROM cloud_license_request_nonces
+            WHERE received_at_utc < now() - interval '10 minutes'
+            """, connection, transaction))
+            await cleanup.ExecuteNonQueryAsync(cancellationToken);
+
+        await transaction.CommitAsync(cancellationToken);
+        return true;
     }
 
     public async Task<bool> RequestInstallationRebindAsync(Guid installationId, CancellationToken cancellationToken)

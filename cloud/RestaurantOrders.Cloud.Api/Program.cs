@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using System.Globalization;
 using Npgsql;
 using RestaurantOrders.Cloud.Api;
 
@@ -130,12 +131,41 @@ app.MapPost("/api/admin/v1/stores/{storeId:guid}/rotate-token", async (
 });
 
 app.MapPost("/api/license/v1/check", async (
-    HttpRequest request,
-    RemoteLicenseCheckRequest? body,
+    HttpContext context,
     CloudLicenseDatabase database,
     LicenseSigner signer,
     CancellationToken cancellationToken) =>
 {
+    var request = context.Request;
+    const int maxBodySize = 16 * 1024;
+    if (request.ContentLength is < 1 or > maxBodySize)
+        return Results.BadRequest(new { error = "Το αίτημα άδειας έχει μη έγκυρο μέγεθος." });
+
+    using var bodyBuffer = new MemoryStream((int)(request.ContentLength ?? 512));
+    var readBuffer = new byte[4096];
+    while (true)
+    {
+        var read = await request.Body.ReadAsync(readBuffer.AsMemory(), cancellationToken);
+        if (read == 0) break;
+        if (bodyBuffer.Length + read > maxBodySize)
+            return Results.BadRequest(new { error = "Το αίτημα άδειας υπερβαίνει το επιτρεπτό μέγεθος." });
+        await bodyBuffer.WriteAsync(readBuffer.AsMemory(0, read), cancellationToken);
+    }
+    if (bodyBuffer.Length == 0)
+        return Results.BadRequest(new { error = "Το αίτημα άδειας είναι κενό." });
+    var bodyBytes = bodyBuffer.ToArray();
+
+    RemoteLicenseCheckRequest? body;
+    try
+    {
+        body = JsonSerializer.Deserialize<RemoteLicenseCheckRequest>(bodyBytes,
+            new JsonSerializerOptions(JsonSerializerDefaults.Web));
+    }
+    catch (JsonException)
+    {
+        return Results.BadRequest(new { error = "Το σώμα του αιτήματος δεν είναι έγκυρο JSON." });
+    }
+
     if (body is null || !Guid.TryParse(body.InstallationId, out var installationId) ||
         string.IsNullOrWhiteSpace(body.MachineName) || body.MachineName.Length > 120 ||
         body.MacAddress is null || body.MacAddress.Length > 64 ||
@@ -143,11 +173,31 @@ app.MapPost("/api/license/v1/check", async (
         return Results.BadRequest(new { error = "Τα στοιχεία εγκατάστασης δεν είναι έγκυρα." });
 
     var machineName = body.MachineName.Trim();
-    var clientToken = ReadBearerToken(request.Headers.Authorization.ToString());
-    var registered = clientToken is null
-        ? await database.RegisterLegacyInstallationAsync(installationId, machineName, body.MacAddress, cancellationToken)
-        : await database.RegisterInstallationAsync(installationId, machineName, body.MacAddress,
+    var hasSignatureHeaders = request.Headers.ContainsKey("X-License-Public-Key") ||
+                              request.Headers.ContainsKey("X-License-Timestamp") ||
+                              request.Headers.ContainsKey("X-License-Nonce") ||
+                              request.Headers.ContainsKey("X-License-Signature");
+    bool registered;
+    if (hasSignatureHeaders)
+    {
+        if (!TryVerifyLicenseCheckSignature(request, bodyBytes, installationId,
+                out var clientPublicKey, out var nonceHash))
+            return Results.Unauthorized();
+
+        registered = await database.RegisterSignedInstallationRequestAsync(installationId, machineName,
+            body.MacAddress, clientPublicKey, nonceHash, cancellationToken);
+        if (registered)
+            context.Response.Headers["X-License-Auth"] = "signature-v1";
+    }
+    else
+    {
+        // Temporary compatibility for already-installed clients that still use the previous bearer protocol.
+        var clientToken = ReadBearerToken(request.Headers.Authorization.ToString());
+        if (clientToken is null)
+            return Results.Unauthorized();
+        registered = await database.RegisterInstallationAsync(installationId, machineName, body.MacAddress,
             SHA256.HashData(Encoding.UTF8.GetBytes(clientToken)), cancellationToken);
+    }
     if (!registered)
         return Results.Unauthorized();
 
@@ -536,6 +586,95 @@ static bool HasMatchingSecret(string supplied, string expected)
 static bool IsValidEmailAddress(string? value) =>
     !string.IsNullOrWhiteSpace(value) && value.Length <= 254 &&
     Regex.IsMatch(value, @"^[^\s@]+@[^\s@]+\.[^\s@]+$", RegexOptions.CultureInvariant);
+
+static bool TryVerifyLicenseCheckSignature(
+    HttpRequest request,
+    byte[] bodyBytes,
+    Guid installationId,
+    out byte[] publicKeyDer,
+    out byte[] nonceHash)
+{
+    publicKeyDer = [];
+    nonceHash = [];
+    var publicKeyText = request.Headers["X-License-Public-Key"].ToString();
+    var timestampText = request.Headers["X-License-Timestamp"].ToString();
+    var nonceText = request.Headers["X-License-Nonce"].ToString();
+    var signatureText = request.Headers["X-License-Signature"].ToString();
+    if (publicKeyText.Length is < 1 or > 512 || timestampText.Length is < 1 or > 12 ||
+        nonceText.Length is < 1 or > 128 || signatureText.Length is < 1 or > 256 ||
+        !long.TryParse(timestampText, NumberStyles.None, CultureInfo.InvariantCulture, out var unixSeconds))
+        return false;
+
+    DateTimeOffset signedAt;
+    try
+    {
+        signedAt = DateTimeOffset.FromUnixTimeSeconds(unixSeconds);
+    }
+    catch (ArgumentOutOfRangeException)
+    {
+        return false;
+    }
+    if ((DateTimeOffset.UtcNow - signedAt).Duration() > TimeSpan.FromMinutes(5))
+        return false;
+
+    byte[] nonceBytes;
+    byte[] signature;
+    try
+    {
+        publicKeyDer = Convert.FromBase64String(publicKeyText);
+        signature = Convert.FromBase64String(signatureText);
+        if (!TryDecodeBase64Url(nonceText, out nonceBytes))
+            return false;
+    }
+    catch (FormatException)
+    {
+        return false;
+    }
+
+    if (publicKeyDer.Length is < 70 or > 200 || nonceBytes.Length is < 16 or > 64 || signature.Length != 64)
+        return false;
+
+    var bodyHash = Convert.ToHexString(SHA256.HashData(bodyBytes)).ToLowerInvariant();
+    var canonical = $"POST\n/api/license/v1/check\n{installationId:D}\n{timestampText}\n{nonceText}\n{bodyHash}";
+    try
+    {
+        using var key = ECDsa.Create();
+        key.ImportSubjectPublicKeyInfo(publicKeyDer, out var bytesRead);
+        if (bytesRead != publicKeyDer.Length || key.KeySize != 256)
+            return false;
+        if (!key.VerifyData(Encoding.UTF8.GetBytes(canonical), signature, HashAlgorithmName.SHA256,
+                DSASignatureFormat.IeeeP1363FixedFieldConcatenation))
+            return false;
+    }
+    catch (CryptographicException)
+    {
+        return false;
+    }
+
+    nonceHash = SHA256.HashData(nonceBytes);
+    return true;
+}
+
+static bool TryDecodeBase64Url(string value, out byte[] bytes)
+{
+    bytes = [];
+    if (value.Any(character => !char.IsAsciiLetterOrDigit(character) && character is not '-' and not '_'))
+        return false;
+
+    var base64 = value.Replace('-', '+').Replace('_', '/');
+    if (base64.Length % 4 == 1)
+        return false;
+    base64 = base64.PadRight(base64.Length + ((4 - base64.Length % 4) % 4), '=');
+    try
+    {
+        bytes = Convert.FromBase64String(base64);
+        return true;
+    }
+    catch (FormatException)
+    {
+        return false;
+    }
+}
 
 static string? ReadBearerToken(string authorization)
 {
