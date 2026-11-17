@@ -45,7 +45,7 @@ services:
       postgres:
         condition: service_healthy
     ports:
-      - ${CLOUD_API_PORT:-8080}:8080"
+      - ${CLOUD_API_PORT:-8080}:8080
     networks:
       - api_public
 
