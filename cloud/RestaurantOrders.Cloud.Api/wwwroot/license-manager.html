@@ -40,9 +40,13 @@
     .side-brand small { display: block; margin-top: 3px; color: #8291ad; font-size: .7rem; letter-spacing: .08em; text-transform: uppercase; }
     .nav-caption { margin: 0 11px 9px; color: #7786a2; font-size: .69rem; font-weight: 800; letter-spacing: .11em; text-transform: uppercase; }
     .nav-list { display: grid; gap: 5px; }
+    .nav-group { display: grid; gap: 3px; }
     .nav-item { display: flex; width: 100%; align-items: center; gap: 12px; padding: 11px 12px; border: 0; border-radius: 11px; color: #aab8d1; background: transparent; text-align: left; transition: .16s ease; }
     .nav-item:hover { color: white; background: #ffffff0e; }
     .nav-item.active { color: white; background: #315bd6; box-shadow: 0 8px 18px #07112755; }
+    .nav-parent.parent-open { color: white; background: #ffffff0b; }
+    .nav-sublist { display: grid; gap: 3px; margin-left: 16px; padding-left: 11px; border-left: 1px solid #ffffff20; }
+    .nav-item.nav-subitem { padding: 9px 11px; font-size: .8rem; }
     .nav-icon { width: 20px; color: inherit; text-align: center; font-size: 1.02rem; }
     .nav-count { min-width: 22px; margin-left: auto; padding: 2px 7px; border-radius: 20px; color: #d8e2ff; background: #ffffff18; font-size: .72rem; text-align: center; }
     .sidebar-bottom { margin-top: auto; padding: 14px 9px 0; border-top: 1px solid #ffffff15; }
@@ -142,6 +146,7 @@
     .modal-head { display: flex; align-items: start; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
     .modal-head h2 { margin: 0; font-size: 1.03rem; }
     .modal-head p { margin: 5px 0 0; color: var(--muted); font-size: .78rem; }
+    .danger-note { margin: 0 0 16px; padding: 12px 14px; border: 1px solid #f0d0cc; border-radius: 11px; color: #8f3029; background: #fff5f3; font-size: .78rem; line-height: 1.5; }
     .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
     .toast { position: fixed; right: 22px; bottom: 22px; z-index: 30; max-width: min(420px, calc(100vw - 34px)); padding: 13px 17px; border: 1px solid #d7e2dc; border-radius: 12px; color: #155b42; background: #f0fff7; box-shadow: 0 12px 35px #15294a20; font-size: .82rem; line-height: 1.45; }
     .toast.error { color: #982b25; border-color: #f0d0cc; background: #fff5f3; }
@@ -158,7 +163,10 @@
       .side-brand { display: none; }
       .nav-caption, .sidebar-bottom { display: none; }
       .nav-list { display: flex; overflow-x: auto; gap: 5px; scrollbar-width: none; }
+      .nav-group { display: flex; gap: 3px; }
+      .nav-sublist { display: flex; gap: 3px; margin: 0; padding: 0; border: 0; }
       .nav-item { width: auto; flex: 0 0 auto; padding: 9px 11px; font-size: .76rem; }
+      .nav-item.nav-subitem { padding: 9px 10px; font-size: .76rem; }
       .nav-icon { width: auto; }
       .nav-count { min-width: 18px; padding: 2px 5px; }
       .topbar { position: static; min-height: 65px; }
@@ -195,10 +203,14 @@
     <form id="login-form" class="login-card">
       <div class="brand-mark" aria-hidden="true">🔐</div>
       <h1>License Manager</h1>
-      <p>Διαχείριση πελατών, αδειών και εγκαταστάσεων RestaurantOrders.</p>
-      <label class="field">Κωδικός διαχειριστή
-        <input id="password" type="password" autocomplete="current-password" required autofocus placeholder="Κωδικός License Manager">
+      <p>Διαχείριση καταστημάτων, αδειών και εγκαταστάσεων RestaurantOrders.</p>
+      <label class="field">Email
+        <input id="email" type="email" autocomplete="username" required autofocus placeholder="name@example.com">
       </label>
+      <label class="field" style="margin-top:14px">Password
+        <input id="password" type="password" autocomplete="current-password" required placeholder="Password License Manager">
+      </label>
+      <p class="helper">Τα στοιχεία σύνδεσης ορίζονται στις μεταβλητές <strong>LICENSE_MANAGER_EMAIL</strong> και <strong>LICENSE_MANAGER_PASSWORD</strong> του stack <strong>cloud</strong> στο Dockhand.</p>
       <p id="login-error" class="helper" role="alert"></p>
       <button id="login-button" class="btn" style="width:100%;margin-top:16px" type="submit">Σύνδεση</button>
     </form>
@@ -212,18 +224,22 @@
       </div>
       <p class="nav-caption">Διαχείριση</p>
       <nav class="nav-list">
-        <button class="nav-item active" type="button" data-view="customers"><span class="nav-icon">♙</span> Πελάτες <span id="customer-count" class="nav-count">0</span></button>
         <button class="nav-item" type="button" data-view="editions"><span class="nav-icon">▣</span> Εκδόσεις αδειών</button>
-        <button class="nav-item" type="button" data-view="installations"><span class="nav-icon">▦</span> Εγκαταστάσεις <span id="installation-count" class="nav-count">0</span></button>
+        <div class="nav-group">
+          <button class="nav-item nav-parent" type="button" data-view="installations"><span class="nav-icon">▦</span> Εγκαταστάσεις <span id="installation-count" class="nav-count">0</span></button>
+          <div class="nav-sublist" aria-label="Επιλογές εγκαταστάσεων">
+            <button class="nav-item nav-subitem active" type="button" data-view="customers" aria-current="page"><span class="nav-icon">▤</span> Καταστήματα <span id="customer-count" class="nav-count">0</span></button>
+          </div>
+        </div>
       </nav>
       <div class="sidebar-bottom"><div class="connection"><span class="connection-dot"></span> Συνδεδεμένο με τον server</div></div>
     </aside>
 
     <div class="main-column">
       <header class="topbar">
-        <div><h1 id="page-title">Πελάτες</h1><p id="page-subtitle">Καρτέλες καταστημάτων, στοιχεία και άδειες χρήσης.</p></div>
+        <div><h1 id="page-title">Καταστήματα</h1><p id="page-subtitle">Καρτέλες καταστημάτων, στοιχεία και άδειες χρήσης.</p></div>
         <div class="top-actions">
-          <label class="search"><span aria-hidden="true">⌕</span><input id="customer-search" type="search" placeholder="Αναζήτηση πελάτη…" aria-label="Αναζήτηση πελάτη"></label>
+          <label class="search"><span aria-hidden="true">⌕</span><input id="customer-search" type="search" placeholder="Αναζήτηση καταστήματος…" aria-label="Αναζήτηση καταστήματος"></label>
           <button id="logout" class="btn secondary small" type="button">Αποσύνδεση</button>
         </div>
       </header>
@@ -239,7 +255,13 @@
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
   <script>
-    let managerPassword = '';
+    const idleTimeoutMs = 10 * 60 * 1000;
+    const sessionRefreshIntervalMs = 4 * 60 * 1000;
+    let managerEmail = '';
+    let isAuthenticated = false;
+    let lastUserActivityAt = 0;
+    let lastSessionRefreshAt = 0;
+    let idleTimer;
     let dashboard = { customers: [], licenses: [], installations: [], editions: [] };
     let activeView = 'customers';
     let selectedCustomerId = null;
@@ -248,7 +270,7 @@
     const byId = id => document.getElementById(id);
     const content = byId('content');
     const titles = {
-      customers: ['Πελάτες', 'Καρτέλες καταστημάτων, στοιχεία και άδειες χρήσης.'],
+      customers: ['Καταστήματα', 'Καρτέλες καταστημάτων, στοιχεία και άδειες χρήσης.'],
       editions: ['Εκδόσεις αδειών', 'Ορισμός διαθέσιμων προγραμμάτων και ορίων εγκαταστάσεων.'],
       installations: ['Εγκαταστάσεις', 'Σύνδεση, ανάθεση και επανασύνδεση συσκευών.']
     };
@@ -277,24 +299,70 @@
     const dateToUtc = value => value ? new Date(`${value}T23:59:59`).toISOString() : null;
     const activeLicense = license => license.status === 'active' && (!license.expiresAtUtc || new Date(license.expiresAtUtc) > new Date());
 
-    function authHeader() {
-      const bytes = new TextEncoder().encode(`manager:${managerPassword}`);
-      let binary = '';
-      for (const value of bytes) binary += String.fromCharCode(value);
-      return `Basic ${btoa(binary)}`;
-    }
     async function api(path, method = 'GET', body) {
-      const headers = { Authorization: authHeader() };
+      const headers = {};
       if (body !== undefined) headers['Content-Type'] = 'application/json';
       const response = await fetch(path, {
         method,
         headers,
         body: body === undefined ? undefined : JSON.stringify(body),
+        credentials: 'same-origin',
         cache: 'no-store'
       });
       const result = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(result.error || `Αποτυχία αιτήματος (${response.status}).`);
+      if (!response.ok) {
+        const error = new Error(result.error || `Αποτυχία αιτήματος (${response.status}).`);
+        error.status = response.status;
+        if (response.status === 401 && isAuthenticated) void endSession(true, false);
+        throw error;
+      }
       return result;
+    }
+    function showManager() {
+      byId('login-error').textContent = '';
+      byId('login-screen').classList.add('hidden');
+      byId('app').classList.remove('hidden');
+      selectedCustomerId = dashboard.customers.find(item => item.isActive)?.id || dashboard.customers[0]?.id || null;
+      drawView();
+      recordActivity(false);
+    }
+    function scheduleIdleLogout() {
+      clearTimeout(idleTimer);
+      const remaining = idleTimeoutMs - (Date.now() - lastUserActivityAt);
+      if (remaining <= 0) { void endSession(true); return; }
+      idleTimer = setTimeout(() => {
+        if (Date.now() - lastUserActivityAt >= idleTimeoutMs) void endSession(true);
+        else scheduleIdleLogout();
+      }, remaining);
+    }
+    function recordActivity(refreshSession = true) {
+      if (!isAuthenticated) return;
+      const now = Date.now();
+      lastUserActivityAt = now;
+      scheduleIdleLogout();
+      if (refreshSession && now - lastSessionRefreshAt >= sessionRefreshIntervalMs) {
+        lastSessionRefreshAt = now;
+        api('/api/license-manager/v1/auth/refresh', 'POST').catch(error => {
+          if (error.status !== 401) toast('Δεν ήταν δυνατή η ανανέωση της σύνδεσης. Έλεγξε τη σύνδεση με τον server.', true);
+        });
+      }
+    }
+    async function endSession(expired = false, notifyServer = true) {
+      clearTimeout(idleTimer);
+      if (notifyServer) {
+        try { await fetch('/api/license-manager/v1/auth/logout', { method: 'POST', credentials: 'same-origin', cache: 'no-store' }); }
+        catch { /* Clear the local view even if the server is unreachable. */ }
+      }
+      isAuthenticated = false;
+      managerEmail = '';
+      dashboard = { customers: [], licenses: [], installations: [], editions: [] };
+      selectedCustomerId = null;
+      byId('modal-root').replaceChildren();
+      byId('app').classList.add('hidden');
+      byId('login-screen').classList.remove('hidden');
+      byId('password').value = '';
+      byId('login-error').textContent = expired ? 'Η σύνδεση έληξε μετά από 10 λεπτά αδράνειας. Συνδέσου ξανά.' : '';
+      byId('email').focus();
     }
     function toast(message, error = false) {
       const box = byId('toast');
@@ -321,7 +389,7 @@
       const pending = dashboard.installations.filter(item => !item.isAssigned).length;
       const activeEditions = dashboard.editions.filter(item => item.isActive).length;
       const items = [
-        ['♙', activeCustomers, 'Ενεργοί πελάτες'],
+        ['♙', activeCustomers, 'Ενεργά καταστήματα'],
         ['▣', validLicenses, 'Ενεργές άδειες'],
         ['◷', pending, 'Σε αναμονή ενεργοποίησης'],
         ['◇', activeEditions, 'Διαθέσιμες εκδόσεις']
@@ -342,6 +410,7 @@
       for (const nav of document.querySelectorAll('.nav-item')) {
         const active = nav.dataset.view === activeView;
         nav.classList.toggle('active', active);
+        nav.classList.toggle('parent-open', nav.classList.contains('nav-parent') && ['customers', 'installations'].includes(activeView));
         if (active) nav.setAttribute('aria-current', 'page');
         else nav.removeAttribute('aria-current');
       }
@@ -361,8 +430,8 @@
     function drawCustomers() {
       const heading = element('div', 'section-heading');
       const headingText = element('div');
-      headingText.append(element('h2', '', 'Πελατολόγιο'), element('p', '', 'Επίλεξε κατάστημα για να δεις ή να επεξεργαστείς την καρτέλα του.'));
-      const add = element('button', 'btn'); add.type = 'button'; add.textContent = '+ Νέος πελάτης'; add.addEventListener('click', openCustomerModal);
+      headingText.append(element('h2', '', 'Καταστήματα'), element('p', '', 'Επίλεξε κατάστημα για να δεις ή να επεξεργαστείς την καρτέλα του.'));
+      const add = element('button', 'btn'); add.type = 'button'; add.textContent = '+ Νέο κατάστημα'; add.addEventListener('click', openCustomerModal);
       heading.append(headingText, add);
 
       const layout = element('div', 'customer-layout');
@@ -379,7 +448,7 @@
       const query = byId('customer-search').value.trim().toLocaleLowerCase('el-GR');
       const customers = dashboard.customers.filter(customer => (showArchived || customer.isActive) &&
         `${customer.shopName} ${customer.storeIdentifier} ${customer.resellerName}`.toLocaleLowerCase('el-GR').includes(query));
-      if (!customers.length) list.append(emptyState(showArchived ? 'Δεν βρέθηκαν πελάτες' : 'Δεν υπάρχουν πελάτες ακόμα', 'Πρόσθεσε ένα κατάστημα για να δημιουργήσεις την πρώτη καρτέλα.', '♙'));
+      if (!customers.length) list.append(emptyState(showArchived ? 'Δεν βρέθηκαν καταστήματα' : 'Δεν υπάρχουν καταστήματα ακόμα', 'Πρόσθεσε ένα κατάστημα για να δημιουργήσεις την πρώτη καρτέλα.', '♙'));
       for (const customer of customers) {
         const row = element('button', `customer-row${selectedCustomerId === customer.id ? ' selected' : ''}${customer.isActive ? '' : ' archived'}`);
         row.type = 'button';
@@ -387,7 +456,7 @@
         row.append(element('span', 'avatar', initials || 'Π'));
         const info = element('span');
         info.append(element('strong', '', customer.shopName), element('small', '', customer.storeIdentifier),
-          element('span', 'mini-status', customer.isActive ? `${customer.activeLicenseCount} ενεργές άδειες` : 'Αρχειοθετημένος'));
+          element('span', 'mini-status', customer.isActive ? `${customer.activeLicenseCount} ενεργές άδειες` : 'Αρχειοθετημένο'));
         row.append(info);
         row.addEventListener('click', () => { selectedCustomerId = customer.id; drawCustomers(); });
         list.append(row);
@@ -398,7 +467,7 @@
       const profilePanel = element('section', 'panel');
       const customer = dashboard.customers.find(item => item.id === selectedCustomerId);
       if (!customer) {
-        profilePanel.append(emptyState('Επίλεξε πελάτη', 'Η καρτέλα του καταστήματος θα εμφανιστεί εδώ.', '⌖'));
+        profilePanel.append(emptyState('Επίλεξε κατάστημα', 'Η καρτέλα του καταστήματος θα εμφανιστεί εδώ.', '⌖'));
       } else {
         drawCustomerProfile(profilePanel, customer);
       }
@@ -413,28 +482,33 @@
       const initials = customer.shopName.trim().split(/\s+/).slice(0, 2).map(part => part[0] || '').join('').toLocaleUpperCase('el-GR');
       title.append(element('span', 'avatar', initials || 'Π'));
       const titleText = element('div');
-      titleText.append(element('h2', '', customer.shopName), element('p', '', `Αναγνωριστικό ${customer.storeIdentifier} · ${customer.isActive ? 'Ενεργός' : 'Αρχειοθετημένος'}`));
+      titleText.append(element('h2', '', customer.shopName), element('p', '', `Αναγνωριστικό ${customer.storeIdentifier} · ${customer.isActive ? 'Ενεργό' : 'Αρχειοθετημένο'}`));
       title.append(titleText);
       header.append(title);
       const actions = element('div', 'profile-actions');
       if (customer.isActive) {
         const addLicense = element('button', 'btn small'); addLicense.type = 'button'; addLicense.textContent = '+ Νέα άδεια';
         addLicense.addEventListener('click', () => body.querySelector('[data-create-license]')?.classList.toggle('hidden'));
-        const del = element('button', 'btn danger small'); del.type = 'button'; del.textContent = 'Απενεργοποίηση / διαγραφή';
+        const del = element('button', 'btn danger small'); del.type = 'button'; del.textContent = 'Απενεργοποίηση';
         del.addEventListener('click', async () => {
-          if (!confirm(`Να απενεργοποιηθεί και να αρχειοθετηθεί ο πελάτης «${customer.shopName}»; Θα ανακληθούν όλες οι άδειές του.`)) return;
-          try { await api(`/api/license-manager/v1/customers/${customer.id}`, 'DELETE'); showArchived = true; await refreshDashboard(); toast('Ο πελάτης αρχειοθετήθηκε και οι άδειές του ανακλήθηκαν.'); }
+          if (!confirm(`Να απενεργοποιηθεί και να αρχειοθετηθεί το κατάστημα «${customer.shopName}»; Θα ανακληθούν όλες οι άδειές του.`)) return;
+          try { await api(`/api/license-manager/v1/customers/${customer.id}`, 'DELETE'); showArchived = true; await refreshDashboard(); toast('Το κατάστημα αρχειοθετήθηκε και οι άδειές του ανακλήθηκαν.'); }
           catch (error) { toast(error.message, true); }
         });
         actions.append(addLicense, del);
       } else {
-        const restore = element('button', 'btn secondary small'); restore.type = 'button'; restore.textContent = 'Επαναφορά πελάτη';
+        const restore = element('button', 'btn secondary small'); restore.type = 'button'; restore.textContent = 'Επαναφορά καταστήματος';
         restore.addEventListener('click', async () => {
-          try { await api(`/api/license-manager/v1/customers/${customer.id}/restore`, 'POST'); await refreshDashboard(); toast('Ο πελάτης επανενεργοποιήθηκε. Ανανεώστε ή εκδώστε άδεια για να ξεκλειδώσετε το κατάστημα.'); }
+          try { await api(`/api/license-manager/v1/customers/${customer.id}/restore`, 'POST'); await refreshDashboard(); toast('Το κατάστημα επανενεργοποιήθηκε. Ανανεώστε ή εκδώστε άδεια για να ξεκλειδώσει.'); }
           catch (error) { toast(error.message, true); }
         });
         actions.append(restore);
       }
+      const hardDelete = element('button', 'btn danger small');
+      hardDelete.type = 'button';
+      hardDelete.textContent = 'Οριστική διαγραφή';
+      hardDelete.addEventListener('click', () => openPermanentDeleteDialog(customer));
+      actions.append(hardDelete);
       header.append(actions);
       body.append(header);
 
@@ -455,7 +529,7 @@
         const values = Object.fromEntries(new FormData(profileForm));
         try {
           await api(`/api/license-manager/v1/customers/${customer.id}`, 'PUT', values);
-          await refreshDashboard(); toast('Τα στοιχεία του πελάτη αποθηκεύτηκαν.');
+          await refreshDashboard(); toast('Τα στοιχεία του καταστήματος αποθηκεύτηκαν.');
         } catch (error) { toast(error.message, true); }
       });
       body.append(profileForm);
@@ -501,10 +575,68 @@
 
       const licenses = dashboard.licenses.filter(item => item.customerId === customer.id);
       const stack = element('div', 'license-stack');
-      if (!licenses.length) stack.append(element('div', 'empty-state', 'Δεν υπάρχουν άδειες για αυτόν τον πελάτη.'));
+      if (!licenses.length) stack.append(element('div', 'empty-state', 'Δεν υπάρχουν άδειες για αυτό το κατάστημα.'));
       for (const license of licenses) stack.append(drawLicenseCard(license, customer.isActive));
       body.append(stack);
       panel.replaceChildren(body);
+    }
+
+    function openPermanentDeleteDialog(customer) {
+      const root = byId('modal-root');
+      root.replaceChildren();
+      const backdrop = element('div', 'modal-backdrop');
+      const modal = element('section', 'modal');
+      modal.setAttribute('role', 'alertdialog');
+      modal.setAttribute('aria-modal', 'true');
+      modal.setAttribute('aria-labelledby', 'permanent-delete-title');
+      const head = element('div', 'modal-head');
+      const title = element('div');
+      title.append(element('h2', '', 'Οριστική διαγραφή καταστήματος'),
+        element('p', '', `${customer.shopName} · ${customer.storeIdentifier}`));
+      title.querySelector('h2').id = 'permanent-delete-title';
+      const close = element('button', 'btn secondary icon');
+      close.type = 'button'; close.textContent = '×'; close.setAttribute('aria-label', 'Κλείσιμο');
+      close.addEventListener('click', () => root.replaceChildren());
+      head.append(title, close);
+
+      const warning = element('p', 'danger-note', 'Θα διαγραφούν οριστικά από τη βάση τα στοιχεία του καταστήματος, όλες οι άδειές του, οι συνδεδεμένες εγκαταστάσεις και το σχετικό ιστορικό. Η ενέργεια δεν αναιρείται.');
+      const form = element('form');
+      const confirmInput = input('confirmStoreIdentifier', '', 'text', true);
+      confirmInput.autocomplete = 'off';
+      confirmInput.placeholder = customer.storeIdentifier;
+      form.append(field(`Πληκτρολόγησε το αναγνωριστικό «${customer.storeIdentifier}» για επιβεβαίωση`, confirmInput));
+      const actions = element('div', 'modal-actions');
+      const cancel = element('button', 'btn secondary');
+      cancel.type = 'button'; cancel.textContent = 'Άκυρο';
+      cancel.addEventListener('click', () => root.replaceChildren());
+      const remove = element('button', 'btn danger');
+      remove.type = 'submit'; remove.textContent = 'Οριστική διαγραφή'; remove.disabled = true;
+      confirmInput.addEventListener('input', () => { remove.disabled = confirmInput.value.trim() !== customer.storeIdentifier; });
+      actions.append(cancel, remove);
+      form.append(actions);
+      form.addEventListener('submit', async event => {
+        event.preventDefault();
+        if (confirmInput.value.trim() !== customer.storeIdentifier) return;
+        remove.disabled = true;
+        remove.textContent = 'Διαγράφεται…';
+        try {
+          await api(`/api/license-manager/v1/customers/${customer.id}/permanent`, 'DELETE');
+          const remaining = dashboard.customers.filter(item => item.id !== customer.id);
+          selectedCustomerId = remaining.find(item => item.isActive)?.id || remaining[0]?.id || null;
+          root.replaceChildren();
+          await refreshDashboard();
+          toast('Το κατάστημα και τα σχετικά δεδομένα διαγράφηκαν οριστικά.');
+        } catch (error) {
+          remove.disabled = false;
+          remove.textContent = 'Οριστική διαγραφή';
+          toast(error.message, true);
+        }
+      });
+      modal.append(head, warning, form);
+      backdrop.append(modal);
+      backdrop.addEventListener('click', event => { if (event.target === backdrop) root.replaceChildren(); });
+      root.append(backdrop);
+      confirmInput.focus();
     }
 
     function drawLicenseCard(license, customerIsActive) {
@@ -564,7 +696,7 @@
       const backdrop = element('div', 'modal-backdrop');
       const modal = element('section', 'modal');
       const head = element('div', 'modal-head');
-      const title = element('div'); title.append(element('h2', '', 'Νέος πελάτης'), element('p', '', 'Καταχώρισε τα στοιχεία του καταστήματος.'));
+      const title = element('div'); title.append(element('h2', '', 'Νέο κατάστημα'), element('p', '', 'Καταχώρισε τα στοιχεία του καταστήματος.'));
       const close = element('button', 'btn secondary icon'); close.type = 'button'; close.textContent = '×'; close.setAttribute('aria-label', 'Κλείσιμο'); close.addEventListener('click', () => root.replaceChildren());
       head.append(title, close);
       const form = element('form', 'form-grid');
@@ -576,7 +708,7 @@
       );
       const actions = element('div', 'modal-actions field full');
       const cancel = element('button', 'btn secondary'); cancel.type = 'button'; cancel.textContent = 'Άκυρο'; cancel.addEventListener('click', () => root.replaceChildren());
-      const save = element('button', 'btn'); save.type = 'submit'; save.textContent = 'Δημιουργία πελάτη';
+      const save = element('button', 'btn'); save.type = 'submit'; save.textContent = 'Δημιουργία καταστήματος';
       actions.append(cancel, save); form.append(actions);
       form.addEventListener('submit', async event => {
         event.preventDefault();
@@ -584,7 +716,7 @@
         try {
           const result = await api('/api/license-manager/v1/customers', 'POST', values);
           selectedCustomerId = result.customerId; showArchived = false; root.replaceChildren();
-          await refreshDashboard(); toast('Η καρτέλα του πελάτη δημιουργήθηκε. Τώρα μπορείς να εκδώσεις την άδειά του.');
+          await refreshDashboard(); toast('Η καρτέλα του καταστήματος δημιουργήθηκε. Τώρα μπορείς να εκδώσεις άδεια.');
         } catch (error) { toast(error.message, true); }
       });
       modal.append(head, form); backdrop.append(modal);
@@ -697,27 +829,54 @@
       content.replaceChildren(heading, list);
     }
 
-    document.querySelectorAll('.nav-item').forEach(nav => nav.addEventListener('click', () => { activeView = nav.dataset.view; drawView(); }));
+    document.querySelectorAll('.nav-item').forEach(nav => nav.addEventListener('click', () => {
+      activeView = nav.dataset.view;
+      drawView();
+      recordActivity();
+    }));
     byId('customer-search').addEventListener('input', () => { if (activeView === 'customers') drawCustomers(); });
-    byId('logout').addEventListener('click', () => {
-      managerPassword = ''; dashboard = { customers: [], licenses: [], installations: [], editions: [] };
-      byId('app').classList.add('hidden'); byId('login-screen').classList.remove('hidden'); byId('password').value = ''; byId('password').focus();
-    });
+    byId('logout').addEventListener('click', () => void endSession(false));
     byId('login-form').addEventListener('submit', async event => {
       event.preventDefault();
       const button = byId('login-button'); button.disabled = true; button.textContent = 'Σύνδεση…';
       byId('login-error').textContent = '';
-      managerPassword = byId('password').value;
+      const email = byId('email').value.trim();
+      const password = byId('password').value;
       try {
+        const session = await api('/api/license-manager/v1/auth/login', 'POST', { email, password });
+        managerEmail = session.email;
+        isAuthenticated = true;
+        lastSessionRefreshAt = Date.now();
         await refreshDashboard();
-        byId('login-screen').classList.add('hidden'); byId('app').classList.remove('hidden');
-        selectedCustomerId = dashboard.customers.find(item => item.isActive)?.id || dashboard.customers[0]?.id || null;
-        drawView();
+        showManager();
       } catch (error) {
-        managerPassword = '';
-        byId('login-error').textContent = error.message === 'Αποτυχία αιτήματος (401).' ? 'Ο κωδικός δεν είναι σωστός.' : error.message;
-      } finally { button.disabled = false; button.textContent = 'Σύνδεση'; }
+        if (isAuthenticated) await endSession(false, false);
+        byId('login-error').textContent = error.message;
+      } finally { byId('password').value = ''; button.disabled = false; button.textContent = 'Σύνδεση'; }
     });
+
+    for (const eventName of ['pointerdown', 'keydown', 'touchstart', 'wheel', 'mousemove'])
+      document.addEventListener(eventName, () => recordActivity(), { passive: true });
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden && isAuthenticated) {
+        if (Date.now() - lastUserActivityAt >= idleTimeoutMs) void endSession(true);
+        else scheduleIdleLogout();
+      }
+    });
+
+    async function restoreSession() {
+      try {
+        const session = await api('/api/license-manager/v1/auth/session');
+        managerEmail = session.email;
+        isAuthenticated = true;
+        lastSessionRefreshAt = Date.now();
+        await refreshDashboard();
+        showManager();
+      } catch (error) {
+        if (error.status !== 401) byId('login-error').textContent = error.message;
+      }
+    }
+    void restoreSession();
   </script>
 </body>
 </html>

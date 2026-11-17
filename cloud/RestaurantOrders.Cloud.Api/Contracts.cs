@@ -18,6 +18,7 @@ public sealed record SyncEventRequest(
 public sealed record SyncBatchResponse(Guid StoreId, int Accepted, int Duplicates);
 
 public sealed record RemoteLicenseCheckRequest(string InstallationId, string MachineName, string MacAddress);
+public sealed record LicenseManagerLoginRequest(string? Email, string? Password);
 public sealed class RemoteLicenseCheckResponse
 {
     public string Status { get; set; } = "pending";

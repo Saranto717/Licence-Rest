@@ -130,7 +130,7 @@ public sealed class CloudLicenseDatabase(NpgsqlDataSource dataSource)
         command.Parameters.AddWithValue("reseller_name", NpgsqlDbType.Varchar, resellerName);
         command.Parameters.AddWithValue("vat_number", NpgsqlDbType.Varchar, vatNumber);
         await command.ExecuteNonQueryAsync(cancellationToken);
-        await AddAuditAsync(null, null, "customer-created", cancellationToken);
+        await AddAuditAsync(null, null, "customer-created", cancellationToken, id);
         return id;
     }
 
@@ -180,8 +180,8 @@ public sealed class CloudLicenseDatabase(NpgsqlDataSource dataSource)
         }
 
         await using (var audit = new NpgsqlCommand("""
-            INSERT INTO cloud_license_audit (license_id, installation_id, action)
-            SELECT l.id, i.installation_id, 'customer-deleted'
+            INSERT INTO cloud_license_audit (license_id, installation_id, customer_id, action)
+            SELECT l.id, i.installation_id, l.customer_id, 'customer-deleted'
             FROM cloud_licenses l
             LEFT JOIN cloud_license_installations i ON i.license_id = l.id AND i.is_assigned = true
             WHERE l.customer_id = @customer_id
@@ -214,6 +214,68 @@ public sealed class CloudLicenseDatabase(NpgsqlDataSource dataSource)
         return true;
     }
 
+    public async Task<bool> PermanentlyDeleteCustomerAsync(Guid customerId, CancellationToken cancellationToken)
+    {
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await using (var lockCustomer = new NpgsqlCommand("""
+            SELECT id FROM cloud_license_customers WHERE id = @id FOR UPDATE
+            """, connection, transaction))
+        {
+            lockCustomer.Parameters.AddWithValue("id", NpgsqlDbType.Uuid, customerId);
+            if (await lockCustomer.ExecuteScalarAsync(cancellationToken) is not Guid)
+                return false;
+        }
+
+        await using (var deleteAudit = new NpgsqlCommand("""
+            DELETE FROM cloud_license_audit
+            WHERE customer_id = @customer_id OR license_id IN (
+                SELECT id FROM cloud_licenses WHERE customer_id = @customer_id
+            ) OR installation_id IN (
+                SELECT installation_id
+                FROM cloud_license_installations
+                WHERE license_id IN (
+                    SELECT id FROM cloud_licenses WHERE customer_id = @customer_id
+                )
+            )
+            """, connection, transaction))
+        {
+            deleteAudit.Parameters.AddWithValue("customer_id", NpgsqlDbType.Uuid, customerId);
+            await deleteAudit.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        await using (var deleteInstallations = new NpgsqlCommand("""
+            DELETE FROM cloud_license_installations
+            WHERE license_id IN (
+                SELECT id FROM cloud_licenses WHERE customer_id = @customer_id
+            )
+            """, connection, transaction))
+        {
+            deleteInstallations.Parameters.AddWithValue("customer_id", NpgsqlDbType.Uuid, customerId);
+            await deleteInstallations.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        await using (var deleteLicenses = new NpgsqlCommand("""
+            DELETE FROM cloud_licenses WHERE customer_id = @customer_id
+            """, connection, transaction))
+        {
+            deleteLicenses.Parameters.AddWithValue("customer_id", NpgsqlDbType.Uuid, customerId);
+            await deleteLicenses.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        await using (var deleteCustomer = new NpgsqlCommand("""
+            DELETE FROM cloud_license_customers WHERE id = @customer_id
+            """, connection, transaction))
+        {
+            deleteCustomer.Parameters.AddWithValue("customer_id", NpgsqlDbType.Uuid, customerId);
+            if (await deleteCustomer.ExecuteNonQueryAsync(cancellationToken) != 1)
+                return false;
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+        return true;
+    }
+
     public async Task<bool> RestoreCustomerAsync(Guid customerId, CancellationToken cancellationToken)
     {
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
@@ -224,7 +286,7 @@ public sealed class CloudLicenseDatabase(NpgsqlDataSource dataSource)
             """, connection);
         command.Parameters.AddWithValue("id", NpgsqlDbType.Uuid, customerId);
         if (await command.ExecuteNonQueryAsync(cancellationToken) != 1) return false;
-        await AddAuditAsync(null, null, "customer-restored", cancellationToken);
+        await AddAuditAsync(null, null, "customer-restored", cancellationToken, customerId);
         return true;
     }
 
@@ -556,21 +618,36 @@ public sealed class CloudLicenseDatabase(NpgsqlDataSource dataSource)
         return new LicenseManagerDashboard(customers, licenses, installations, editions);
     }
 
-    private async Task AddAuditAsync(Guid? licenseId, Guid? installationId, string action, CancellationToken cancellationToken)
+    private async Task AddAuditAsync(Guid? licenseId, Guid? installationId, string action,
+        CancellationToken cancellationToken, Guid? customerId = null)
     {
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
-        await AddAuditAsync(connection, null, licenseId, installationId, action, cancellationToken);
+        await AddAuditAsync(connection, null, licenseId, installationId, action, cancellationToken, customerId);
     }
 
     private static async Task AddAuditAsync(NpgsqlConnection connection, NpgsqlTransaction? transaction,
-        Guid? licenseId, Guid? installationId, string action, CancellationToken cancellationToken)
+        Guid? licenseId, Guid? installationId, string action, CancellationToken cancellationToken,
+        Guid? customerId = null)
     {
         await using var command = new NpgsqlCommand("""
-            INSERT INTO cloud_license_audit (license_id, installation_id, action)
-            VALUES (@license_id, @installation_id, @action)
+            INSERT INTO cloud_license_audit (license_id, installation_id, customer_id, action)
+            VALUES (
+                @license_id,
+                @installation_id,
+                COALESCE(
+                    @customer_id,
+                    (SELECT customer_id FROM cloud_licenses WHERE id = @license_id),
+                    (SELECT license.customer_id
+                     FROM cloud_license_installations installation
+                     JOIN cloud_licenses license ON license.id = installation.license_id
+                     WHERE installation.installation_id = @installation_id)
+                ),
+                @action
+            )
             """, connection, transaction);
         command.Parameters.AddWithValue("license_id", NpgsqlDbType.Uuid, licenseId is null ? DBNull.Value : licenseId.Value);
         command.Parameters.AddWithValue("installation_id", NpgsqlDbType.Uuid, installationId is null ? DBNull.Value : installationId.Value);
+        command.Parameters.AddWithValue("customer_id", NpgsqlDbType.Uuid, customerId is null ? DBNull.Value : customerId.Value);
         command.Parameters.AddWithValue("action", NpgsqlDbType.Varchar, action);
         await command.ExecuteNonQueryAsync(cancellationToken);
     }

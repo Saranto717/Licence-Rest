@@ -32,14 +32,18 @@ if (string.IsNullOrWhiteSpace(connectionString))
 var adminKey = ReadConfiguredSecret(builder.Configuration, "Cloud:AdminKey", "Cloud:AdminKeyFile");
 if (string.IsNullOrWhiteSpace(adminKey) || Encoding.UTF8.GetByteCount(adminKey) < 32)
     throw new InvalidOperationException("Cloud:AdminKey must contain at least 32 bytes of secret material.");
+var licenseManagerEmail = builder.Configuration["Cloud:LicenseManagerEmail"]?.Trim();
+if (!IsValidEmailAddress(licenseManagerEmail))
+    throw new InvalidOperationException("Cloud:LicenseManagerEmail must contain a valid email address.");
 var licenseManagerPassword = ReadConfiguredSecret(builder.Configuration, "Cloud:LicenseManagerPassword", "Cloud:LicenseManagerPasswordFile");
-if (Encoding.UTF8.GetByteCount(licenseManagerPassword) < 32)
-    throw new InvalidOperationException("Cloud:LicenseManagerPassword must contain at least 32 bytes of secret material.");
+if (licenseManagerPassword.Length < 12)
+    throw new InvalidOperationException("Cloud:LicenseManagerPassword must contain at least 12 characters.");
 var licenseSigningPrivateKey = await ReadLicenseSigningPrivateKeyAsync(builder.Configuration);
 
 builder.Services.AddSingleton(_ => NpgsqlDataSource.Create(connectionString));
 builder.Services.AddSingleton<CloudDatabase>();
 builder.Services.AddSingleton<CloudLicenseDatabase>();
+builder.Services.AddSingleton<LicenseManagerSessions>();
 builder.Services.AddSingleton(new LicenseSigner(licenseSigningPrivateKey));
 
 var app = builder.Build();
@@ -181,13 +185,40 @@ app.MapPost("/api/license/v1/check", async (
     });
 });
 
+app.MapPost("/api/license-manager/v1/auth/login", (
+    LicenseManagerLoginRequest? body,
+    HttpContext context,
+    LicenseManagerSessions sessions) =>
+{
+    var suppliedEmail = body?.Email?.Trim();
+    var suppliedPassword = body?.Password ?? "";
+    if (!string.Equals(suppliedEmail, licenseManagerEmail, StringComparison.OrdinalIgnoreCase) ||
+        !HasMatchingSecret(suppliedPassword, licenseManagerPassword))
+        return Results.Json(new { error = "Το email ή ο κωδικός δεν είναι σωστά." }, statusCode: StatusCodes.Status401Unauthorized);
+
+    sessions.Create(context, licenseManagerEmail!);
+    return Results.Ok(new { email = licenseManagerEmail, expiresInSeconds = LicenseManagerSessions.IdleTimeoutSeconds });
+});
+
+app.MapPost("/api/license-manager/v1/auth/logout", (HttpContext context, LicenseManagerSessions sessions) =>
+{
+    sessions.Revoke(context);
+    return Results.Ok(new { status = "signed-out" });
+});
+
 var licenseManager = app.MapGroup("/api/license-manager/v1");
 licenseManager.AddEndpointFilter(async (context, next) =>
 {
-    if (!HasLicenseManagerAccess(context.HttpContext.Request, licenseManagerPassword))
+    var sessions = context.HttpContext.RequestServices.GetRequiredService<LicenseManagerSessions>();
+    if (!sessions.TryRefresh(context.HttpContext, out _))
         return Results.Unauthorized();
     return await next(context);
 });
+
+licenseManager.MapGet("/auth/session", (HttpContext context, LicenseManagerSessions sessions) =>
+    Results.Ok(new { email = sessions.GetEmail(context), expiresInSeconds = LicenseManagerSessions.IdleTimeoutSeconds }));
+licenseManager.MapPost("/auth/refresh", (HttpContext context, LicenseManagerSessions sessions) =>
+    Results.Ok(new { email = sessions.GetEmail(context), expiresInSeconds = LicenseManagerSessions.IdleTimeoutSeconds }));
 
 licenseManager.MapGet("/dashboard", async (CloudLicenseDatabase database, CancellationToken cancellationToken) =>
 {
@@ -261,6 +292,17 @@ licenseManager.MapDelete("/customers/{customerId:guid}", async (
     return deleted
         ? Results.Ok(new { status = "deleted", message = "Ο πελάτης αρχειοθετήθηκε και οι άδειές του ανακλήθηκαν." })
         : Results.NotFound(new { error = "Δεν βρέθηκε ενεργός πελάτης." });
+});
+
+licenseManager.MapDelete("/customers/{customerId:guid}/permanent", async (
+    Guid customerId,
+    CloudLicenseDatabase database,
+    CancellationToken cancellationToken) =>
+{
+    var deleted = await database.PermanentlyDeleteCustomerAsync(customerId, cancellationToken);
+    return deleted
+        ? Results.Ok(new { status = "permanently-deleted", message = "Το κατάστημα, οι άδειες, οι εγκαταστάσεις και το σχετικό ιστορικό διαγράφηκαν οριστικά." })
+        : Results.NotFound(new { error = "Δεν βρέθηκε το κατάστημα." });
 });
 
 licenseManager.MapPost("/customers/{customerId:guid}/restore", async (
@@ -484,23 +526,9 @@ static bool HasMatchingSecret(string supplied, string expected)
     return CryptographicOperations.FixedTimeEquals(suppliedHash, expectedHash);
 }
 
-static bool HasLicenseManagerAccess(HttpRequest request, string expectedPassword)
-{
-    const string prefix = "Basic ";
-    var authorization = request.Headers.Authorization.ToString();
-    if (!authorization.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) return false;
-    try
-    {
-        var credential = Encoding.UTF8.GetString(Convert.FromBase64String(authorization[prefix.Length..].Trim()));
-        var separator = credential.IndexOf(':');
-        if (separator < 0 || !string.Equals(credential[..separator], "manager", StringComparison.Ordinal)) return false;
-        return HasMatchingSecret(credential[(separator + 1)..], expectedPassword);
-    }
-    catch (FormatException)
-    {
-        return false;
-    }
-}
+static bool IsValidEmailAddress(string? value) =>
+    !string.IsNullOrWhiteSpace(value) && value.Length <= 254 &&
+    Regex.IsMatch(value, @"^[^\s@]+@[^\s@]+\.[^\s@]+$", RegexOptions.CultureInvariant);
 
 static string? ReadBearerToken(string authorization)
 {
