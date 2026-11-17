@@ -3,223 +3,720 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#111b32">
   <title>RestaurantOrders · License Manager</title>
   <style>
-    :root { color-scheme: light; font-family: Segoe UI, Arial, sans-serif; color: #172b4d; background: #eef3f9; }
+    :root {
+      color-scheme: light;
+      font-family: Inter, "Segoe UI", Arial, sans-serif;
+      color: #172033;
+      background: #f4f6fb;
+      font-synthesis: none;
+      text-rendering: optimizeLegibility;
+      --ink: #172033;
+      --muted: #71809a;
+      --line: #e4e9f2;
+      --blue: #315bd6;
+      --blue-dark: #2549b7;
+      --nav: #111b32;
+      --green: #15845b;
+      --red: #bb352f;
+      --surface: #fff;
+    }
     * { box-sizing: border-box; }
-    body { margin: 0; }
-    header { padding: 22px clamp(16px, 4vw, 48px); background: #102b50; color: white; }
-    header h1 { margin: 0; font-size: clamp(1.3rem, 3vw, 1.9rem); }
-    header p { margin: 6px 0 0; color: #d8e5f5; }
-    main { width: min(1320px, calc(100% - 28px)); margin: 22px auto; }
-    .card { margin: 14px 0; padding: 18px; border: 1px solid #d9e2ee; border-radius: 15px; background: white; box-shadow: 0 5px 18px #19385b0d; }
-    h2 { margin: 0 0 13px; font-size: 1.1rem; }
-    .login, .form-grid { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; }
-    label { display: grid; gap: 5px; min-width: 150px; color: #52647d; font-size: .84rem; font-weight: 700; }
-    input, select { min-height: 40px; width: 100%; padding: 8px 10px; border: 1px solid #cbd6e4; border-radius: 8px; background: white; color: #152640; font: inherit; }
-    button { min-height: 40px; padding: 8px 13px; border: 1px solid #294c7d; border-radius: 9px; background: #183d6b; color: white; font: inherit; font-weight: 750; cursor: pointer; }
-    button.secondary { border-color: #cbd6e4; background: #f5f8fc; color: #263b59; }
-    button.danger { border-color: #bb3428; background: #b42318; }
-    button:disabled { opacity: .55; cursor: wait; }
-    .field-name { flex: 1 1 240px; }
-    .field-vat { flex: 0 1 150px; }
-    .field-date { flex: 0 1 180px; }
-    .field-limit { flex: 0 1 150px; }
-    #licenses, #installations { display: grid; gap: 10px; }
-    .license, .installation { padding: 14px; border: 1px solid #dce5f0; border-radius: 12px; background: #fbfdff; }
-    .license-top, .installation-top { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: start; gap: 10px; }
-    .license-top strong, .installation-top strong { display: block; font-size: 1rem; }
-    .muted { color: #6a7890; font-size: .84rem; line-height: 1.5; overflow-wrap: anywhere; }
-    .pill { display: inline-block; margin-top: 4px; padding: 4px 9px; border-radius: 999px; background: #e6f6ea; color: #176b35; font-size: .76rem; font-weight: 800; }
-    .pill.off { background: #fff0ef; color: #a5281c; }
-    .row-actions { display: flex; align-items: end; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-    .row-actions label { flex: 0 1 210px; }
-    .status { min-height: 24px; margin: 10px 0 0; color: #52647d; }
-    .status.error { color: #b42318; }
-    .empty { padding: 15px; border-radius: 10px; background: #f5f8fc; color: #68768c; }
-    .hint { margin: 7px 0 0; color: #64748b; font-size: .85rem; }
-    @media (max-width: 620px) { main { width: calc(100% - 18px); margin: 10px auto; } .card { padding: 13px; } label { flex: 1 1 100%; } .row-actions label { flex: 1 1 100%; } }
+    body { margin: 0; min-width: 320px; min-height: 100vh; background: #f4f6fb; }
+    button, input, select { font: inherit; }
+    button { cursor: pointer; }
+    .login-screen { min-height: 100vh; display: grid; place-items: center; padding: 22px; background: radial-gradient(ellipse at 50% 0, #e8edff, #f4f6fb 54%); }
+    .login-card { width: min(460px, 100%); padding: 34px; border: 1px solid var(--line); border-radius: 22px; background: white; box-shadow: 0 24px 70px #17294e16; }
+    .brand-mark { display: grid; width: 48px; height: 48px; place-items: center; border-radius: 15px; color: #fff; background: linear-gradient(145deg, #4c78f0, #2849b8); font-size: 22px; box-shadow: 0 10px 24px #315bd636; }
+    .login-card h1 { margin: 20px 0 5px; font-size: 1.55rem; letter-spacing: -.035em; }
+    .login-card p { margin: 0 0 24px; color: var(--muted); line-height: 1.55; }
+    .app-shell { min-height: 100vh; display: grid; grid-template-columns: 254px minmax(0, 1fr); }
+    .sidebar { position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; padding: 22px 15px 16px; color: #d5deef; background: var(--nav); }
+    .side-brand { display: flex; align-items: center; gap: 11px; padding: 3px 10px 27px; color: white; }
+    .side-brand .brand-mark { flex: 0 0 42px; width: 42px; height: 42px; border-radius: 13px; font-size: 20px; }
+    .side-brand strong { display: block; font-size: .96rem; letter-spacing: -.02em; }
+    .side-brand small { display: block; margin-top: 3px; color: #8291ad; font-size: .7rem; letter-spacing: .08em; text-transform: uppercase; }
+    .nav-caption { margin: 0 11px 9px; color: #7786a2; font-size: .69rem; font-weight: 800; letter-spacing: .11em; text-transform: uppercase; }
+    .nav-list { display: grid; gap: 5px; }
+    .nav-item { display: flex; width: 100%; align-items: center; gap: 12px; padding: 11px 12px; border: 0; border-radius: 11px; color: #aab8d1; background: transparent; text-align: left; transition: .16s ease; }
+    .nav-item:hover { color: white; background: #ffffff0e; }
+    .nav-item.active { color: white; background: #315bd6; box-shadow: 0 8px 18px #07112755; }
+    .nav-icon { width: 20px; color: inherit; text-align: center; font-size: 1.02rem; }
+    .nav-count { min-width: 22px; margin-left: auto; padding: 2px 7px; border-radius: 20px; color: #d8e2ff; background: #ffffff18; font-size: .72rem; text-align: center; }
+    .sidebar-bottom { margin-top: auto; padding: 14px 9px 0; border-top: 1px solid #ffffff15; }
+    .connection { display: flex; align-items: center; gap: 8px; color: #9cacc5; font-size: .78rem; }
+    .connection-dot { width: 8px; height: 8px; border-radius: 50%; background: #32c58a; box-shadow: 0 0 0 4px #32c58a22; }
+    .main-column { min-width: 0; }
+    .topbar { position: sticky; top: 0; z-index: 5; min-height: 76px; display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 13px clamp(20px, 3vw, 44px); border-bottom: 1px solid var(--line); background: #ffffffed; backdrop-filter: blur(14px); }
+    .topbar h1 { margin: 0; font-size: 1.05rem; letter-spacing: -.02em; }
+    .topbar p { margin: 4px 0 0; color: var(--muted); font-size: .8rem; }
+    .top-actions { display: flex; align-items: center; gap: 10px; }
+    .search { position: relative; width: min(290px, 31vw); }
+    .search input { width: 100%; padding-left: 36px; }
+    .search span { position: absolute; top: 10px; left: 12px; color: #94a0b3; }
+    .content-wrap { width: min(1540px, 100%); margin: 0 auto; padding: 25px clamp(18px, 3vw, 44px) 48px; }
+    .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-bottom: 22px; }
+    .stat-card { display: flex; align-items: center; gap: 13px; min-height: 91px; padding: 17px; border: 1px solid var(--line); border-radius: 15px; background: var(--surface); box-shadow: 0 4px 13px #26385a06; }
+    .stat-icon { display: grid; width: 42px; height: 42px; flex: 0 0 42px; place-items: center; border-radius: 13px; color: #315bd6; background: #edf1ff; font-size: 1.12rem; }
+    .stat-card:nth-child(2) .stat-icon { color: #16845c; background: #e9f8f1; }
+    .stat-card:nth-child(3) .stat-icon { color: #ad7221; background: #fff6e7; }
+    .stat-card:nth-child(4) .stat-icon { color: #7255c5; background: #f2edff; }
+    .stat-value { display: block; font-size: 1.25rem; font-weight: 800; letter-spacing: -.04em; }
+    .stat-label { display: block; margin-top: 3px; color: var(--muted); font-size: .77rem; }
+    .section-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 14px; margin: 0 0 15px; }
+    .section-heading h2 { margin: 0; font-size: 1.15rem; letter-spacing: -.025em; }
+    .section-heading p { margin: 5px 0 0; color: var(--muted); font-size: .83rem; }
+    .customer-layout { display: grid; grid-template-columns: minmax(245px, 315px) minmax(0, 1fr); gap: 16px; align-items: start; }
+    .panel { min-width: 0; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); box-shadow: 0 4px 15px #26385a07; }
+    .panel-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 16px 17px; border-bottom: 1px solid var(--line); }
+    .panel-head h2, .panel-head h3 { margin: 0; font-size: .95rem; }
+    .panel-body { padding: 17px; }
+    .customer-list { display: grid; max-height: calc(100vh - 320px); min-height: 220px; overflow: auto; padding: 7px; }
+    .customer-row { display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 10px; width: 100%; padding: 11px 10px; border: 0; border-radius: 11px; background: transparent; text-align: left; }
+    .customer-row:hover { background: #f5f7fc; }
+    .customer-row.selected { background: #edf2ff; }
+    .avatar { display: grid; width: 36px; height: 36px; place-items: center; border-radius: 11px; color: #315bd6; background: #e2eaff; font-weight: 800; }
+    .customer-row strong { display: block; overflow: hidden; color: var(--ink); font-size: .83rem; text-overflow: ellipsis; white-space: nowrap; }
+    .customer-row small { display: block; overflow: hidden; margin-top: 4px; color: var(--muted); font-size: .72rem; text-overflow: ellipsis; white-space: nowrap; }
+    .customer-row .mini-status { display: block; margin-top: 5px; color: #16845c; font-size: .66rem; font-weight: 800; text-transform: uppercase; }
+    .customer-row.archived .mini-status { color: #a05b48; }
+    .profile-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
+    .profile-title { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .profile-title .avatar { width: 48px; height: 48px; border-radius: 14px; font-size: 1.03rem; }
+    .profile-title h2 { margin: 0; overflow-wrap: anywhere; font-size: 1.12rem; letter-spacing: -.03em; }
+    .profile-title p { margin: 5px 0 0; color: var(--muted); font-size: .78rem; }
+    .profile-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+    .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .field { display: grid; gap: 6px; min-width: 0; color: #4e5c73; font-size: .76rem; font-weight: 750; }
+    .field.full { grid-column: 1 / -1; }
+    input, select { width: 100%; min-height: 42px; padding: 9px 11px; border: 1px solid #d9e0eb; border-radius: 9px; outline: none; color: var(--ink); background: white; transition: border-color .15s, box-shadow .15s; }
+    input:focus, select:focus { border-color: #6c8df0; box-shadow: 0 0 0 3px #315bd61c; }
+    input:disabled, select:disabled { color: #7d889c; background: #f4f6fa; }
+    .btn { min-height: 40px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 8px 13px; border: 1px solid transparent; border-radius: 9px; color: white; background: var(--blue); font-size: .8rem; font-weight: 800; transition: .15s ease; }
+    .btn:hover { background: var(--blue-dark); transform: translateY(-1px); }
+    .btn:disabled { opacity: .56; cursor: wait; transform: none; }
+    .btn.secondary { color: #34435a; border-color: #dce2ec; background: white; }
+    .btn.secondary:hover { background: #f6f8fc; }
+    .btn.ghost { color: #42536e; border-color: #e6eaf1; background: #f8f9fc; }
+    .btn.danger { color: white; border-color: #ad2e29; background: var(--red); }
+    .btn.danger:hover { background: #a82b26; }
+    .btn.small { min-height: 34px; padding: 6px 10px; font-size: .74rem; }
+    .btn.icon { width: 39px; min-width: 39px; padding: 0; }
+    .helper { margin: 8px 0 0; color: var(--muted); font-size: .76rem; line-height: 1.5; }
+    .divider { height: 1px; margin: 19px 0; background: var(--line); }
+    .license-section { margin-top: 22px; }
+    .license-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 11px; }
+    .license-head h3 { margin: 0; font-size: .95rem; }
+    .license-stack { display: grid; gap: 11px; }
+    .license-card { padding: 14px; border: 1px solid var(--line); border-radius: 13px; background: #fbfcff; }
+    .license-card-top { display: flex; align-items: start; justify-content: space-between; gap: 12px; margin-bottom: 13px; }
+    .license-card-top strong { display: block; font-size: .85rem; }
+    .license-card-top small { display: block; margin-top: 4px; color: var(--muted); font-size: .72rem; overflow-wrap: anywhere; }
+    .badge { display: inline-flex; align-items: center; gap: 5px; padding: 5px 9px; border-radius: 30px; color: #14734f; background: #e7f7ef; font-size: .68rem; font-weight: 850; white-space: nowrap; }
+    .badge.off { color: #a04437; background: #fff0ed; }
+    .badge.wait { color: #916313; background: #fff5df; }
+    .license-fields { display: grid; grid-template-columns: minmax(150px, 1fr) minmax(180px, 1fr); gap: 10px; }
+    .license-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 11px; }
+    .empty-state { display: grid; min-height: 220px; place-items: center; padding: 25px; color: var(--muted); text-align: center; }
+    .empty-icon { display: grid; width: 52px; height: 52px; margin: 0 auto 12px; place-items: center; border-radius: 17px; color: #5473d2; background: #edf2ff; font-size: 1.28rem; }
+    .empty-state strong { display: block; margin-bottom: 4px; color: #314057; }
+    .archive-toggle { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: .75rem; font-weight: 650; }
+    .archive-toggle input { width: 16px; min-height: 16px; margin: 0; accent-color: var(--blue); }
+    .edition-grid, .installation-grid { display: grid; gap: 12px; }
+    .edition-card { display: grid; grid-template-columns: minmax(140px, 1.4fr) minmax(125px, .8fr) minmax(125px, .8fr) auto auto; gap: 12px; align-items: end; padding: 15px; }
+    .edition-card .field { font-size: .7rem; }
+    .edition-card .field input { min-height: 39px; }
+    .switch-field { display: flex; align-items: center; gap: 7px; min-height: 39px; color: #56657b; font-size: .74rem; font-weight: 750; }
+    .switch-field input { width: 17px; min-height: 17px; accent-color: var(--blue); }
+    .installation-card { padding: 15px; }
+    .installation-top { display: flex; align-items: start; justify-content: space-between; gap: 12px; }
+    .installation-top strong { display: block; font-size: .87rem; }
+    .installation-top .muted { margin-top: 5px; }
+    .muted { color: var(--muted); font-size: .75rem; line-height: 1.55; overflow-wrap: anywhere; }
+    .installation-actions { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; margin-top: 14px; }
+    .installation-actions .field { width: min(360px, 100%); }
+    .modal-backdrop { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 18px; background: #0c172acc; backdrop-filter: blur(4px); }
+    .modal { width: min(520px, 100%); padding: 23px; border: 1px solid #e2e7f0; border-radius: 18px; background: white; box-shadow: 0 28px 100px #0004; }
+    .modal-head { display: flex; align-items: start; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+    .modal-head h2 { margin: 0; font-size: 1.03rem; }
+    .modal-head p { margin: 5px 0 0; color: var(--muted); font-size: .78rem; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+    .toast { position: fixed; right: 22px; bottom: 22px; z-index: 30; max-width: min(420px, calc(100vw - 34px)); padding: 13px 17px; border: 1px solid #d7e2dc; border-radius: 12px; color: #155b42; background: #f0fff7; box-shadow: 0 12px 35px #15294a20; font-size: .82rem; line-height: 1.45; }
+    .toast.error { color: #982b25; border-color: #f0d0cc; background: #fff5f3; }
+    .hidden { display: none !important; }
+    .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
+    @media (max-width: 1100px) {
+      .app-shell { grid-template-columns: 220px minmax(0, 1fr); }
+      .edition-card { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .edition-card .edition-save { grid-column: 2; justify-self: end; }
+    }
+    @media (max-width: 760px) {
+      .app-shell { grid-template-columns: 1fr; }
+      .sidebar { position: sticky; top: 0; z-index: 8; height: auto; padding: 9px 12px; }
+      .side-brand { display: none; }
+      .nav-caption, .sidebar-bottom { display: none; }
+      .nav-list { display: flex; overflow-x: auto; gap: 5px; scrollbar-width: none; }
+      .nav-item { width: auto; flex: 0 0 auto; padding: 9px 11px; font-size: .76rem; }
+      .nav-icon { width: auto; }
+      .nav-count { min-width: 18px; padding: 2px 5px; }
+      .topbar { position: static; min-height: 65px; }
+      .top-actions .search { display: none; }
+      .content-wrap { padding-top: 16px; }
+      .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+      .stat-card { min-height: 76px; padding: 12px; }
+      .customer-layout { grid-template-columns: 1fr; }
+      .customer-list { max-height: 250px; min-height: 120px; }
+      .profile-header { flex-direction: column; }
+      .profile-actions { justify-content: flex-start; }
+    }
+    @media (max-width: 480px) {
+      .content-wrap { padding-right: 12px; padding-left: 12px; }
+      .topbar { padding-right: 13px; padding-left: 13px; }
+      .stats { gap: 7px; }
+      .stat-card { gap: 9px; padding: 10px; }
+      .stat-icon { width: 34px; height: 34px; flex-basis: 34px; }
+      .stat-value { font-size: 1.05rem; }
+      .stat-label { font-size: .68rem; }
+      .panel-body { padding: 13px; }
+      .form-grid, .license-fields { grid-template-columns: 1fr; }
+      .field.full { grid-column: auto; }
+      .license-card-top { flex-direction: column; }
+      .edition-card { grid-template-columns: 1fr; }
+      .edition-card .edition-save { grid-column: auto; justify-self: stretch; }
+      .section-heading { align-items: flex-start; }
+      .section-heading > .btn { flex: 0 0 auto; }
+    }
   </style>
 </head>
 <body>
-  <header>
-    <h1>🔐 RestaurantOrders License Manager</h1>
-    <p>Πελάτες, ενεργοποίηση εγκαταστάσεων, ανανέωση και ακύρωση αδειών.</p>
-  </header>
-  <main>
-    <section class="card">
-      <h2>Σύνδεση διαχειριστή</h2>
-      <div class="login">
-        <label style="flex:1 1 280px">Κωδικός License Manager
-          <input id="password" type="password" autocomplete="current-password" placeholder="Κωδικός από το cloud configuration">
-        </label>
-        <button id="connect">Σύνδεση / Ανανέωση</button>
+  <section id="login-screen" class="login-screen">
+    <form id="login-form" class="login-card">
+      <div class="brand-mark" aria-hidden="true">🔐</div>
+      <h1>License Manager</h1>
+      <p>Διαχείριση πελατών, αδειών και εγκαταστάσεων RestaurantOrders.</p>
+      <label class="field">Κωδικός διαχειριστή
+        <input id="password" type="password" autocomplete="current-password" required autofocus placeholder="Κωδικός License Manager">
+      </label>
+      <p id="login-error" class="helper" role="alert"></p>
+      <button id="login-button" class="btn" style="width:100%;margin-top:16px" type="submit">Σύνδεση</button>
+    </form>
+  </section>
+
+  <div id="app" class="app-shell hidden">
+    <aside class="sidebar" aria-label="Κύρια πλοήγηση">
+      <div class="side-brand">
+        <div class="brand-mark" aria-hidden="true">🔐</div>
+        <div><strong>RestaurantOrders</strong><small>License Manager</small></div>
       </div>
-      <p id="status" class="status" role="status"></p>
-    </section>
+      <p class="nav-caption">Διαχείριση</p>
+      <nav class="nav-list">
+        <button class="nav-item active" type="button" data-view="customers"><span class="nav-icon">♙</span> Πελάτες <span id="customer-count" class="nav-count">0</span></button>
+        <button class="nav-item" type="button" data-view="editions"><span class="nav-icon">▣</span> Εκδόσεις αδειών</button>
+        <button class="nav-item" type="button" data-view="installations"><span class="nav-icon">▦</span> Εγκαταστάσεις <span id="installation-count" class="nav-count">0</span></button>
+      </nav>
+      <div class="sidebar-bottom"><div class="connection"><span class="connection-dot"></span> Συνδεδεμένο με τον server</div></div>
+    </aside>
 
-    <section id="workspace" hidden>
-      <section class="card">
-        <h2>Νέα άδεια πελάτη</h2>
-        <form id="create-license" class="form-grid">
-          <label class="field-name">Επωνυμία καταστήματος<input name="customerName" maxlength="160" required></label>
-          <label class="field-vat">ΑΦΜ<input name="vatNumber" maxlength="32"></label>
-          <label class="field-date">Λήξη (κενό = μόνιμη)<input name="expiresAt" type="date"></label>
-          <label class="field-limit">Εγκαταστάσεις<input name="maxInstallations" type="number" min="1" max="100" value="1" required></label>
-          <button type="submit">Δημιουργία άδειας</button>
-        </form>
-      </section>
+    <div class="main-column">
+      <header class="topbar">
+        <div><h1 id="page-title">Πελάτες</h1><p id="page-subtitle">Καρτέλες καταστημάτων, στοιχεία και άδειες χρήσης.</p></div>
+        <div class="top-actions">
+          <label class="search"><span aria-hidden="true">⌕</span><input id="customer-search" type="search" placeholder="Αναζήτηση πελάτη…" aria-label="Αναζήτηση πελάτη"></label>
+          <button id="logout" class="btn secondary small" type="button">Αποσύνδεση</button>
+        </div>
+      </header>
 
-      <section class="card">
-        <h2>Άδειες</h2>
-        <div id="licenses"><div class="empty">Δεν υπάρχουν άδειες.</div></div>
-      </section>
+      <main class="content-wrap">
+        <section id="stats" class="stats" aria-label="Σύνοψη"></section>
+        <div id="content"></div>
+      </main>
+    </div>
+  </div>
 
-      <section class="card">
-        <h2>Εγκαταστάσεις πελατών</h2>
-        <p class="hint">Νέα εγκατάσταση εμφανίζεται εδώ μόλις συνδεθεί στον server. Ανάθεσε μια ενεργή άδεια για να ενεργοποιηθεί απομακρυσμένα.</p>
-        <div id="installations"><div class="empty">Δεν έχουν συνδεθεί εγκαταστάσεις.</div></div>
-      </section>
-    </section>
-  </main>
+  <div id="modal-root"></div>
+  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+
   <script>
     let managerPassword = '';
+    let dashboard = { customers: [], licenses: [], installations: [], editions: [] };
+    let activeView = 'customers';
+    let selectedCustomerId = null;
+    let showArchived = false;
+    let toastTimer;
     const byId = id => document.getElementById(id);
-    const statusBox = byId('status');
-    function showStatus(message, error = false) { statusBox.textContent = message || ''; statusBox.className = error ? 'status error' : 'status'; }
-    function basicHeader() {
+    const content = byId('content');
+    const titles = {
+      customers: ['Πελάτες', 'Καρτέλες καταστημάτων, στοιχεία και άδειες χρήσης.'],
+      editions: ['Εκδόσεις αδειών', 'Ορισμός διαθέσιμων προγραμμάτων και ορίων εγκαταστάσεων.'],
+      installations: ['Εγκαταστάσεις', 'Σύνδεση, ανάθεση και επανασύνδεση συσκευών.']
+    };
+    const element = (tag, className, text) => {
+      const node = document.createElement(tag);
+      if (className) node.className = className;
+      if (text !== undefined) node.textContent = text;
+      return node;
+    };
+    const field = (labelText, control, className = '') => {
+      const label = element('label', `field ${className}`.trim(), labelText);
+      label.append(control);
+      return label;
+    };
+    const input = (name, value = '', type = 'text', required = false) => {
+      const control = document.createElement('input');
+      control.name = name;
+      control.type = type;
+      control.value = value ?? '';
+      control.required = required;
+      return control;
+    };
+    const option = (select, text, value) => select.append(new Option(text, value));
+    const formatDate = value => value ? new Intl.DateTimeFormat('el-GR', { dateStyle: 'medium' }).format(new Date(value)) : 'Χωρίς λήξη';
+    const dateValue = value => value ? new Date(value).toISOString().slice(0, 10) : '';
+    const dateToUtc = value => value ? new Date(`${value}T23:59:59`).toISOString() : null;
+    const activeLicense = license => license.status === 'active' && (!license.expiresAtUtc || new Date(license.expiresAtUtc) > new Date());
+
+    function authHeader() {
       const bytes = new TextEncoder().encode(`manager:${managerPassword}`);
       let binary = '';
       for (const value of bytes) binary += String.fromCharCode(value);
       return `Basic ${btoa(binary)}`;
     }
     async function api(path, method = 'GET', body) {
-      const headers = { Authorization: basicHeader() };
+      const headers = { Authorization: authHeader() };
       if (body !== undefined) headers['Content-Type'] = 'application/json';
-      const response = await fetch(path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), cache: 'no-store' });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.error || `Αποτυχία αιτήματος (${response.status}).`);
-      return data;
+      const response = await fetch(path, {
+        method,
+        headers,
+        body: body === undefined ? undefined : JSON.stringify(body),
+        cache: 'no-store'
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || `Αποτυχία αιτήματος (${response.status}).`);
+      return result;
     }
-    function dateText(value) { return value ? new Date(value).toLocaleDateString('el-GR') : 'Μόνιμη'; }
-    function dateInputValue(value) { return value ? new Date(value).toISOString().slice(0, 10) : ''; }
-    function dateToUtc(value) { return value ? new Date(`${value}T23:59:59`).toISOString() : null; }
-    function node(tag, text, className) { const el = document.createElement(tag); if (text !== undefined) el.textContent = text; if (className) el.className = className; return el; }
-
-    async function refresh() {
-      const data = await api('/api/license-manager/v1/dashboard');
-      drawLicenses(data.licenses || []);
-      drawInstallations(data.installations || [], data.licenses || []);
-      byId('workspace').hidden = false;
-      showStatus('Συνδέθηκε με τον License Manager.');
+    function toast(message, error = false) {
+      const box = byId('toast');
+      box.textContent = message;
+      box.classList.toggle('error', error);
+      box.classList.remove('hidden');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => box.classList.add('hidden'), 4200);
     }
-    function drawLicenses(licenses) {
-      const root = byId('licenses'); root.replaceChildren();
-      if (!licenses.length) { root.append(node('div', 'Δεν υπάρχουν άδειες.', 'empty')); return; }
-      for (const license of licenses) {
-        const card = node('article', undefined, 'license');
-        const top = node('div', undefined, 'license-top');
-        const info = node('div');
-        info.append(node('strong', license.customerName));
-        info.append(node('div', `ΑΦΜ: ${license.vatNumber || '—'} · ${license.activeInstallations}/${license.maxInstallations} εγκαταστάσεις · Λήξη: ${dateText(license.expiresAtUtc)}`, 'muted'));
-        const expired = license.expiresAtUtc && new Date(license.expiresAtUtc) <= new Date();
-        const active = license.status === 'active' && !expired;
-        info.append(node('span', expired ? 'ΛΗΞΗ' : (license.status === 'active' ? 'ΕΝΕΡΓΗ' : 'ΑΚΥΡΩΜΕΝΗ'), `pill${active ? '' : ' off'}`));
-        top.append(info, node('code', license.id, 'muted')); card.append(top);
-        const actions = node('div', undefined, 'row-actions');
-        const expiry = node('label', undefined); expiry.append(document.createTextNode('Νέα ημερομηνία λήξης'));
-        const date = document.createElement('input'); date.type = 'date'; date.value = dateInputValue(license.expiresAtUtc); expiry.append(date);
-        const renew = node('button', 'Ανανέωση'); renew.type = 'button';
-        renew.addEventListener('click', async () => {
-          try { await api(`/api/license-manager/v1/licenses/${license.id}/renew`, 'PUT', { expiresAtUtc: dateToUtc(date.value) }); await refresh(); }
-          catch (error) { showStatus(error.message, true); }
-        });
-        actions.append(expiry, renew);
-        if (license.status !== 'revoked') {
-          const revoke = node('button', 'Ακύρωση άδειας', 'danger'); revoke.type = 'button';
-          revoke.addEventListener('click', async () => {
-            if (!confirm(`Να ακυρωθεί η άδεια του ${license.customerName};`)) return;
-            try { await api(`/api/license-manager/v1/licenses/${license.id}/revoke`, 'POST'); await refresh(); }
-            catch (error) { showStatus(error.message, true); }
-          });
-          actions.append(revoke);
-        }
-        card.append(actions); root.append(card);
+    async function refreshDashboard() {
+      dashboard = await api('/api/license-manager/v1/dashboard');
+      dashboard.customers ||= [];
+      dashboard.licenses ||= [];
+      dashboard.installations ||= [];
+      dashboard.editions ||= [];
+      byId('customer-count').textContent = String(dashboard.customers.filter(item => item.isActive).length);
+      byId('installation-count').textContent = String(dashboard.installations.length);
+      drawStats();
+      drawView();
+    }
+    function drawStats() {
+      const activeCustomers = dashboard.customers.filter(item => item.isActive).length;
+      const validLicenses = dashboard.licenses.filter(activeLicense).length;
+      const pending = dashboard.installations.filter(item => !item.isAssigned).length;
+      const activeEditions = dashboard.editions.filter(item => item.isActive).length;
+      const items = [
+        ['♙', activeCustomers, 'Ενεργοί πελάτες'],
+        ['▣', validLicenses, 'Ενεργές άδειες'],
+        ['◷', pending, 'Σε αναμονή ενεργοποίησης'],
+        ['◇', activeEditions, 'Διαθέσιμες εκδόσεις']
+      ];
+      const root = byId('stats');
+      root.replaceChildren(...items.map(([icon, value, label]) => {
+        const card = element('article', 'stat-card');
+        card.append(element('span', 'stat-icon', icon));
+        const info = element('div');
+        info.append(element('strong', 'stat-value', String(value)), element('span', 'stat-label', label));
+        card.append(info);
+        return card;
+      }));
+    }
+    function drawView() {
+      byId('page-title').textContent = titles[activeView][0];
+      byId('page-subtitle').textContent = titles[activeView][1];
+      for (const nav of document.querySelectorAll('.nav-item')) {
+        const active = nav.dataset.view === activeView;
+        nav.classList.toggle('active', active);
+        if (active) nav.setAttribute('aria-current', 'page');
+        else nav.removeAttribute('aria-current');
       }
+      byId('customer-search').classList.toggle('hidden', activeView !== 'customers');
+      if (activeView === 'customers') drawCustomers();
+      else if (activeView === 'editions') drawEditions();
+      else drawInstallations();
     }
-    function drawInstallations(installations, licenses) {
-      const root = byId('installations'); root.replaceChildren();
-      if (!installations.length) { root.append(node('div', 'Δεν έχουν συνδεθεί εγκαταστάσεις.', 'empty')); return; }
-      for (const installation of installations) {
-        const card = node('article', undefined, 'installation');
-        const top = node('div', undefined, 'installation-top');
-        const info = node('div');
-        info.append(node('strong', installation.machineName || 'Υπολογιστής'));
-        info.append(node('div', `ID: ${installation.installationId}`, 'muted'));
-        info.append(node('div', `Τελευταία σύνδεση: ${new Date(installation.lastSeenAtUtc).toLocaleString('el-GR')}`, 'muted'));
-        const state = installation.isAssigned ? `${installation.customerName || 'Άγνωστος πελάτης'} · ${installation.licenseStatus || ''}` : 'Αναμένει ενεργοποίηση';
-        info.append(node('span', state.toUpperCase(), `pill${installation.isAssigned && installation.licenseStatus === 'active' ? '' : ' off'}`));
-        if (installation.rebindPending)
-          info.append(node('span', 'ΑΝΑΜΟΝΗ ΕΠΑΝΑΣΥΝΔΕΣΗΣ · πάτησε «Έλεγχος / λήψη άδειας» στο POS', 'pill off'));
-        top.append(info); card.append(top);
-        const actions = node('div', undefined, 'row-actions');
+    function emptyState(title, detail, icon = '◇') {
+      const root = element('div', 'empty-state');
+      const box = element('div');
+      box.append(element('span', 'empty-icon', icon), element('strong', '', title), element('span', '', detail));
+      root.append(box);
+      return root;
+    }
+
+    function drawCustomers() {
+      const heading = element('div', 'section-heading');
+      const headingText = element('div');
+      headingText.append(element('h2', '', 'Πελατολόγιο'), element('p', '', 'Επίλεξε κατάστημα για να δεις ή να επεξεργαστείς την καρτέλα του.'));
+      const add = element('button', 'btn'); add.type = 'button'; add.textContent = '+ Νέος πελάτης'; add.addEventListener('click', openCustomerModal);
+      heading.append(headingText, add);
+
+      const layout = element('div', 'customer-layout');
+      const listPanel = element('section', 'panel');
+      const listHead = element('div', 'panel-head');
+      listHead.append(element('h2', '', 'Καταστήματα'));
+      const archiveLabel = element('label', 'archive-toggle');
+      const archiveInput = input('showArchived', '', 'checkbox');
+      archiveInput.checked = showArchived;
+      archiveInput.addEventListener('change', () => { showArchived = archiveInput.checked; drawCustomers(); });
+      archiveLabel.append(archiveInput, document.createTextNode('Αρχειοθετημένοι'));
+      listHead.append(archiveLabel);
+      const list = element('div', 'customer-list');
+      const query = byId('customer-search').value.trim().toLocaleLowerCase('el-GR');
+      const customers = dashboard.customers.filter(customer => (showArchived || customer.isActive) &&
+        `${customer.shopName} ${customer.storeIdentifier} ${customer.resellerName}`.toLocaleLowerCase('el-GR').includes(query));
+      if (!customers.length) list.append(emptyState(showArchived ? 'Δεν βρέθηκαν πελάτες' : 'Δεν υπάρχουν πελάτες ακόμα', 'Πρόσθεσε ένα κατάστημα για να δημιουργήσεις την πρώτη καρτέλα.', '♙'));
+      for (const customer of customers) {
+        const row = element('button', `customer-row${selectedCustomerId === customer.id ? ' selected' : ''}${customer.isActive ? '' : ' archived'}`);
+        row.type = 'button';
+        const initials = customer.shopName.trim().split(/\s+/).slice(0, 2).map(part => part[0] || '').join('').toLocaleUpperCase('el-GR');
+        row.append(element('span', 'avatar', initials || 'Π'));
+        const info = element('span');
+        info.append(element('strong', '', customer.shopName), element('small', '', customer.storeIdentifier),
+          element('span', 'mini-status', customer.isActive ? `${customer.activeLicenseCount} ενεργές άδειες` : 'Αρχειοθετημένος'));
+        row.append(info);
+        row.addEventListener('click', () => { selectedCustomerId = customer.id; drawCustomers(); });
+        list.append(row);
+      }
+      listPanel.append(listHead, list);
+      layout.append(listPanel);
+
+      const profilePanel = element('section', 'panel');
+      const customer = dashboard.customers.find(item => item.id === selectedCustomerId);
+      if (!customer) {
+        profilePanel.append(emptyState('Επίλεξε πελάτη', 'Η καρτέλα του καταστήματος θα εμφανιστεί εδώ.', '⌖'));
+      } else {
+        drawCustomerProfile(profilePanel, customer);
+      }
+      layout.append(profilePanel);
+      content.replaceChildren(heading, layout);
+    }
+
+    function drawCustomerProfile(panel, customer) {
+      const body = element('div', 'panel-body');
+      const header = element('div', 'profile-header');
+      const title = element('div', 'profile-title');
+      const initials = customer.shopName.trim().split(/\s+/).slice(0, 2).map(part => part[0] || '').join('').toLocaleUpperCase('el-GR');
+      title.append(element('span', 'avatar', initials || 'Π'));
+      const titleText = element('div');
+      titleText.append(element('h2', '', customer.shopName), element('p', '', `Αναγνωριστικό ${customer.storeIdentifier} · ${customer.isActive ? 'Ενεργός' : 'Αρχειοθετημένος'}`));
+      title.append(titleText);
+      header.append(title);
+      const actions = element('div', 'profile-actions');
+      if (customer.isActive) {
+        const addLicense = element('button', 'btn small'); addLicense.type = 'button'; addLicense.textContent = '+ Νέα άδεια';
+        addLicense.addEventListener('click', () => body.querySelector('[data-create-license]')?.classList.toggle('hidden'));
+        const del = element('button', 'btn danger small'); del.type = 'button'; del.textContent = 'Απενεργοποίηση / διαγραφή';
+        del.addEventListener('click', async () => {
+          if (!confirm(`Να απενεργοποιηθεί και να αρχειοθετηθεί ο πελάτης «${customer.shopName}»; Θα ανακληθούν όλες οι άδειές του.`)) return;
+          try { await api(`/api/license-manager/v1/customers/${customer.id}`, 'DELETE'); showArchived = true; await refreshDashboard(); toast('Ο πελάτης αρχειοθετήθηκε και οι άδειές του ανακλήθηκαν.'); }
+          catch (error) { toast(error.message, true); }
+        });
+        actions.append(addLicense, del);
+      } else {
+        const restore = element('button', 'btn secondary small'); restore.type = 'button'; restore.textContent = 'Επαναφορά πελάτη';
+        restore.addEventListener('click', async () => {
+          try { await api(`/api/license-manager/v1/customers/${customer.id}/restore`, 'POST'); await refreshDashboard(); toast('Ο πελάτης επανενεργοποιήθηκε. Ανανεώστε ή εκδώστε άδεια για να ξεκλειδώσετε το κατάστημα.'); }
+          catch (error) { toast(error.message, true); }
+        });
+        actions.append(restore);
+      }
+      header.append(actions);
+      body.append(header);
+
+      const profileForm = element('form', 'form-grid');
+      profileForm.append(
+        field('Αναγνωριστικό καταστήματος', input('storeIdentifier', customer.storeIdentifier, 'text', true)),
+        field('Ονομασία καταστήματος', input('shopName', customer.shopName, 'text', true)),
+        field('Όνομα μεταπωλητή', input('resellerName', customer.resellerName, 'text', true)),
+        field('ΑΦΜ', input('vatNumber', customer.vatNumber || '', 'text'))
+      );
+      for (const control of profileForm.querySelectorAll('input')) control.disabled = !customer.isActive;
+      const saveRow = element('div', 'field full');
+      const save = element('button', 'btn'); save.type = 'submit'; save.textContent = 'Αποθήκευση στοιχείων'; save.disabled = !customer.isActive;
+      saveRow.append(save);
+      profileForm.append(saveRow);
+      profileForm.addEventListener('submit', async event => {
+        event.preventDefault();
+        const values = Object.fromEntries(new FormData(profileForm));
+        try {
+          await api(`/api/license-manager/v1/customers/${customer.id}`, 'PUT', values);
+          await refreshDashboard(); toast('Τα στοιχεία του πελάτη αποθηκεύτηκαν.');
+        } catch (error) { toast(error.message, true); }
+      });
+      body.append(profileForm);
+      body.append(element('div', 'divider'));
+
+      const licenseHeader = element('div', 'license-head');
+      licenseHeader.append(element('h3', '', 'Άδειες χρήσης'));
+      licenseHeader.append(element('span', 'muted', `${dashboard.licenses.filter(item => item.customerId === customer.id).length} συνολικά`));
+      body.append(licenseHeader);
+
+      const createForm = element('form', 'license-card hidden');
+      createForm.dataset.createLicense = '';
+      createForm.innerHTML = '<div class="license-card-top"><div><strong>Νέα άδεια</strong><small>Επίλεξε έκδοση και ημερομηνία λήξης.</small></div><span class="badge wait">ΝΕΑ</span></div>';
+      const fields = element('div', 'license-fields');
+      const edition = document.createElement('select'); edition.name = 'editionId'; edition.required = true;
+      option(edition, 'Επίλεξε έκδοση άδειας', '');
+      for (const item of dashboard.editions.filter(item => item.isActive)) option(edition, `${item.name} · έως ${item.maxInstallations} εγκαταστάσεις`, item.id);
+      const expiry = input('expiresAtUtc', '', 'date', true);
+      const firstEdition = dashboard.editions.find(item => item.isActive);
+      if (firstEdition) {
+        const date = new Date(); date.setMonth(date.getMonth() + firstEdition.defaultDurationMonths); expiry.value = dateValue(date);
+        edition.value = firstEdition.id;
+      }
+      edition.addEventListener('change', () => {
+        const selected = dashboard.editions.find(item => item.id === edition.value);
+        if (selected) { const date = new Date(); date.setMonth(date.getMonth() + selected.defaultDurationMonths); expiry.value = dateValue(date); }
+      });
+      fields.append(field('Έκδοση άδειας', edition), field('Ημερομηνία λήξης', expiry));
+      createForm.append(fields);
+      const createActions = element('div', 'license-actions');
+      const issue = element('button', 'btn small'); issue.type = 'submit'; issue.textContent = 'Δημιουργία άδειας'; issue.disabled = !customer.isActive || !dashboard.editions.some(item => item.isActive);
+      const cancel = element('button', 'btn secondary small'); cancel.type = 'button'; cancel.textContent = 'Άκυρο'; cancel.addEventListener('click', () => createForm.classList.add('hidden'));
+      createActions.append(issue, cancel); createForm.append(createActions);
+      createForm.addEventListener('submit', async event => {
+        event.preventDefault();
+        const values = Object.fromEntries(new FormData(createForm));
+        try {
+          await api(`/api/license-manager/v1/customers/${customer.id}/licenses`, 'POST', { editionId: values.editionId, expiresAtUtc: dateToUtc(values.expiresAtUtc) });
+          await refreshDashboard(); toast('Η νέα άδεια δημιουργήθηκε.');
+        } catch (error) { toast(error.message, true); }
+      });
+      body.append(createForm);
+
+      const licenses = dashboard.licenses.filter(item => item.customerId === customer.id);
+      const stack = element('div', 'license-stack');
+      if (!licenses.length) stack.append(element('div', 'empty-state', 'Δεν υπάρχουν άδειες για αυτόν τον πελάτη.'));
+      for (const license of licenses) stack.append(drawLicenseCard(license, customer.isActive));
+      body.append(stack);
+      panel.replaceChildren(body);
+    }
+
+    function drawLicenseCard(license, customerIsActive) {
+      const card = element('article', 'license-card');
+      const active = customerIsActive && activeLicense(license);
+      const top = element('div', 'license-card-top');
+      const info = element('div');
+      const expiryText = license.expiresAtUtc ? `Λήξη ${formatDate(license.expiresAtUtc)}` : 'Χωρίς λήξη';
+      info.append(element('strong', '', license.editionName || 'Προηγούμενη έκδοση'), element('small', '', `${license.activeInstallations}/${license.maxInstallations} εγκαταστάσεις · ${expiryText} · ID ${license.id}`));
+      top.append(info, element('span', `badge${active ? '' : ' off'}`, active ? 'ΕΝΕΡΓΗ' : license.status === 'revoked' || !customerIsActive ? 'ΑΠΕΝΕΡΓΟΠΟΙΗΜΕΝΗ' : 'ΛΗΞΗ'));
+      card.append(top);
+
+      const terms = element('form', 'license-fields');
+      const edition = document.createElement('select'); edition.name = 'editionId';
+      option(edition, 'Επίλεξε έκδοση', '');
+      for (const item of dashboard.editions) option(edition, `${item.name}${item.isActive ? '' : ' · ανενεργή'}`, item.id);
+      edition.value = license.editionId || '';
+      const expiry = input('expiresAtUtc', dateValue(license.expiresAtUtc), 'date', true);
+      terms.append(field('Έκδοση άδειας', edition), field('Ημερομηνία λήξης', expiry));
+      terms.querySelectorAll('input,select').forEach(control => control.disabled = !customerIsActive);
+      const actions = element('div', 'license-actions');
+      const save = element('button', 'btn small'); save.type = 'submit'; save.textContent = 'Αποθήκευση στοιχείων'; save.disabled = !customerIsActive;
+      const renew = element('button', 'btn secondary small'); renew.type = 'button'; renew.textContent = 'Ανανέωση'; renew.disabled = !customerIsActive;
+      renew.addEventListener('click', async () => {
+        const date = dateToUtc(expiry.value);
+        if (!date) { toast('Συμπλήρωσε νέα ημερομηνία λήξης.', true); return; }
+        try {
+          await api(`/api/license-manager/v1/licenses/${license.id}/renew`, 'PUT', { expiresAtUtc: date });
+          await refreshDashboard(); toast('Η άδεια ανανεώθηκε.');
+        } catch (error) { toast(error.message, true); }
+      });
+      actions.append(save, renew);
+      if (customerIsActive && license.status !== 'revoked') {
+        const revoke = element('button', 'btn danger small'); revoke.type = 'button'; revoke.textContent = 'Απενεργοποίηση';
+        revoke.addEventListener('click', async () => {
+          if (!confirm(`Να απενεργοποιηθεί η άδεια του ${license.customerName};`)) return;
+          try { await api(`/api/license-manager/v1/licenses/${license.id}/revoke`, 'POST'); await refreshDashboard(); toast('Η άδεια ανακλήθηκε. Το συνδεδεμένο POS θα κλειδώσει στον επόμενο έλεγχο.'); }
+          catch (error) { toast(error.message, true); }
+        });
+        actions.append(revoke);
+      }
+      terms.addEventListener('submit', async event => {
+        event.preventDefault();
+        const values = Object.fromEntries(new FormData(terms));
+        if (!values.editionId) { toast('Επίλεξε έκδοση άδειας.', true); return; }
+        try {
+          await api(`/api/license-manager/v1/licenses/${license.id}`, 'PUT', { editionId: values.editionId, expiresAtUtc: dateToUtc(values.expiresAtUtc) });
+          await refreshDashboard(); toast('Η έκδοση και η λήξη της άδειας ενημερώθηκαν.');
+        } catch (error) { toast(error.message, true); }
+      });
+      card.append(terms, actions);
+      return card;
+    }
+
+    function openCustomerModal() {
+      const root = byId('modal-root'); root.replaceChildren();
+      const backdrop = element('div', 'modal-backdrop');
+      const modal = element('section', 'modal');
+      const head = element('div', 'modal-head');
+      const title = element('div'); title.append(element('h2', '', 'Νέος πελάτης'), element('p', '', 'Καταχώρισε τα στοιχεία του καταστήματος.'));
+      const close = element('button', 'btn secondary icon'); close.type = 'button'; close.textContent = '×'; close.setAttribute('aria-label', 'Κλείσιμο'); close.addEventListener('click', () => root.replaceChildren());
+      head.append(title, close);
+      const form = element('form', 'form-grid');
+      form.append(
+        field('Αναγνωριστικό καταστήματος', input('storeIdentifier', '', 'text', true), 'full'),
+        field('Ονομασία καταστήματος', input('shopName', '', 'text', true)),
+        field('Όνομα μεταπωλητή', input('resellerName', '', 'text', true)),
+        field('ΑΦΜ', input('vatNumber', '', 'text'))
+      );
+      const actions = element('div', 'modal-actions field full');
+      const cancel = element('button', 'btn secondary'); cancel.type = 'button'; cancel.textContent = 'Άκυρο'; cancel.addEventListener('click', () => root.replaceChildren());
+      const save = element('button', 'btn'); save.type = 'submit'; save.textContent = 'Δημιουργία πελάτη';
+      actions.append(cancel, save); form.append(actions);
+      form.addEventListener('submit', async event => {
+        event.preventDefault();
+        const values = Object.fromEntries(new FormData(form));
+        try {
+          const result = await api('/api/license-manager/v1/customers', 'POST', values);
+          selectedCustomerId = result.customerId; showArchived = false; root.replaceChildren();
+          await refreshDashboard(); toast('Η καρτέλα του πελάτη δημιουργήθηκε. Τώρα μπορείς να εκδώσεις την άδειά του.');
+        } catch (error) { toast(error.message, true); }
+      });
+      modal.append(head, form); backdrop.append(modal);
+      backdrop.addEventListener('click', event => { if (event.target === backdrop) root.replaceChildren(); });
+      root.append(backdrop);
+      modal.querySelector('input')?.focus();
+    }
+
+    function drawEditions() {
+      const heading = element('div', 'section-heading');
+      const intro = element('div'); intro.append(element('h2', '', 'Κατάλογος εκδόσεων'), element('p', '', 'Κάθε έκδοση ορίζει όριο εγκαταστάσεων και προτεινόμενη διάρκεια.'));
+      heading.append(intro);
+      const createPanel = element('section', 'panel');
+      const createHead = element('div', 'panel-head'); createHead.append(element('h2', '', 'Νέα έκδοση άδειας'));
+      const createBody = element('div', 'panel-body');
+      const form = element('form', 'form-grid');
+      form.append(field('Όνομα έκδοσης', input('name', '', 'text', true)), field('Μέγιστες εγκαταστάσεις', input('maxInstallations', '1', 'number', true)), field('Προτεινόμενη διάρκεια (μήνες)', input('defaultDurationMonths', '12', 'number', true)));
+      const saveRow = element('div', 'field full'); const save = element('button', 'btn'); save.type = 'submit'; save.textContent = 'Προσθήκη έκδοσης'; saveRow.append(save); form.append(saveRow);
+      form.addEventListener('submit', async event => {
+        event.preventDefault();
+        const values = Object.fromEntries(new FormData(form));
+        try {
+          await api('/api/license-manager/v1/license-editions', 'POST', { name: values.name, maxInstallations: Number(values.maxInstallations), defaultDurationMonths: Number(values.defaultDurationMonths), isActive: true });
+          await refreshDashboard(); toast('Η νέα έκδοση άδειας προστέθηκε.');
+        } catch (error) { toast(error.message, true); }
+      });
+      createBody.append(form); createPanel.append(createHead, createBody);
+      const listHead = element('div', 'section-heading');
+      const listTitle = element('div'); listTitle.append(element('h2', '', 'Διαθέσιμες εκδόσεις'), element('p', '', 'Οι αλλαγές στα όρια ισχύουν στις νέες άδειες.'));
+      listHead.append(listTitle);
+      const list = element('div', 'edition-grid');
+      if (!dashboard.editions.length) list.append(emptyState('Δεν υπάρχουν εκδόσεις', 'Πρόσθεσε την πρώτη έκδοση για να μπορείς να εκδίδεις άδειες.'));
+      for (const edition of dashboard.editions) {
+        const card = element('form', 'panel edition-card');
+        const name = input('name', edition.name, 'text', true);
+        const installs = input('maxInstallations', String(edition.maxInstallations), 'number', true); installs.min = '1'; installs.max = '100';
+        const months = input('defaultDurationMonths', String(edition.defaultDurationMonths), 'number', true); months.min = '1'; months.max = '120';
+        card.append(field('Όνομα', name), field('Εγκαταστάσεις', installs), field('Διάρκεια (μήνες)', months));
+        const active = input('isActive', '', 'checkbox'); active.checked = edition.isActive;
+        const activeField = element('label', 'switch-field'); activeField.append(active, document.createTextNode('Ενεργή'));
+        card.append(activeField);
+        const save = element('button', 'btn secondary small edition-save'); save.type = 'submit'; save.textContent = `Αποθήκευση · ${edition.licenseCount} άδειες`;
+        card.append(save);
+        card.addEventListener('submit', async event => {
+          event.preventDefault(); const values = Object.fromEntries(new FormData(card));
+          try {
+            await api(`/api/license-manager/v1/license-editions/${edition.id}`, 'PUT', { name: values.name, maxInstallations: Number(values.maxInstallations), defaultDurationMonths: Number(values.defaultDurationMonths), isActive: active.checked });
+            await refreshDashboard(); toast('Η έκδοση ενημερώθηκε.');
+          } catch (error) { toast(error.message, true); }
+        });
+        list.append(card);
+      }
+      content.replaceChildren(heading, createPanel, listHead, list);
+    }
+
+    function drawInstallations() {
+      const heading = element('div', 'section-heading');
+      const intro = element('div'); intro.append(element('h2', '', 'Συσκευές πελατών'), element('p', '', 'Ανάθεσε άδεια σε εκκρεμή εγκατάσταση ή διαχειρίσου συνδεδεμένη συσκευή.'));
+      const refresh = element('button', 'btn secondary small'); refresh.type = 'button'; refresh.textContent = '↻ Ανανέωση'; refresh.addEventListener('click', () => refreshDashboard().catch(error => toast(error.message, true)));
+      heading.append(intro, refresh);
+      const list = element('div', 'installation-grid');
+      if (!dashboard.installations.length) list.append(emptyState('Δεν υπάρχουν εγκαταστάσεις', 'Μια εγκατάσταση θα εμφανιστεί όταν το POS συνδεθεί στον server.', '▦'));
+      for (const installation of dashboard.installations) {
+        const card = element('article', 'panel installation-card');
+        const top = element('div', 'installation-top');
+        const info = element('div');
+        info.append(element('strong', '', installation.machineName || 'Υπολογιστής'),
+          element('div', 'muted', `ID εγκατάστασης: ${installation.installationId}`),
+          element('div', 'muted', `Κατάστημα: ${installation.customerName || '—'} · ${installation.storeIdentifier || 'χωρίς αναγνωριστικό'}`),
+          element('div', 'muted', `Τελευταία σύνδεση: ${new Date(installation.lastSeenAtUtc).toLocaleString('el-GR')}`));
+        const state = installation.rebindPending ? 'Αναμονή επανασύνδεσης' : installation.isAssigned ? (installation.licenseStatus || 'Ανατεθειμένη').toUpperCase() : 'Χωρίς άδεια';
+        top.append(info, element('span', `badge${installation.isAssigned && installation.licenseStatus === 'active' ? '' : ' off'}`, state));
+        card.append(top);
+        const actions = element('div', 'installation-actions');
         if (!installation.isAssigned) {
-          const label = node('label', 'Ανάθεση άδειας');
           const select = document.createElement('select');
-          select.append(new Option('Επίλεξε ενεργή άδεια', ''));
-          for (const license of licenses.filter(item => item.status === 'active' && (!item.expiresAtUtc || new Date(item.expiresAtUtc) > new Date()) && item.activeInstallations < item.maxInstallations))
-            select.append(new Option(`${license.customerName} · ${dateText(license.expiresAtUtc)}`, license.id));
-          label.append(select);
-          const assign = node('button', 'Ενεργοποίηση'); assign.type = 'button'; assign.disabled = true;
-          select.addEventListener('change', () => { assign.disabled = !select.value; });
+          option(select, 'Επίλεξε ενεργή άδεια', '');
+          for (const license of dashboard.licenses.filter(item => activeLicense(item) && item.activeInstallations < item.maxInstallations && dashboard.customers.find(customer => customer.id === item.customerId)?.isActive))
+            option(select, `${license.customerName} · ${license.editionName || 'Άδεια'} · ${formatDate(license.expiresAtUtc)}`, license.id);
+          actions.append(field('Ανάθεση άδειας', select));
+          const assign = element('button', 'btn small'); assign.type = 'button'; assign.textContent = 'Ενεργοποίηση'; assign.disabled = true;
+          select.addEventListener('change', () => assign.disabled = !select.value);
           assign.addEventListener('click', async () => {
-            try { await api(`/api/license-manager/v1/installations/${installation.installationId}/assign`, 'POST', { licenseId: select.value }); await refresh(); }
-            catch (error) { showStatus(error.message, true); }
+            try { await api(`/api/license-manager/v1/installations/${installation.installationId}/assign`, 'POST', { licenseId: select.value }); await refreshDashboard(); toast('Η άδεια ανατέθηκε. Στο POS πάτησε «Έλεγχος / λήψη άδειας».'); }
+            catch (error) { toast(error.message, true); }
           });
-          actions.append(label, assign);
+          actions.append(assign);
         } else {
           if (installation.rebindPending) {
-            actions.append(node('span', 'Η άδεια διατηρείται. Ολοκλήρωσε τη σύνδεση από την ίδια συσκευή.', 'muted'));
+            actions.append(element('span', 'muted', 'Στην ίδια συσκευή πάτησε «Έλεγχος / λήψη άδειας μέσω Internet».'));
           } else {
-            const rebind = node('button', 'Επανασύνδεση συσκευής', 'secondary'); rebind.type = 'button';
+            const rebind = element('button', 'btn secondary small'); rebind.type = 'button'; rebind.textContent = 'Επανασύνδεση συσκευής';
             rebind.addEventListener('click', async () => {
-              if (!confirm(`Να επιτραπεί στον υπολογιστή «${installation.machineName}» να ξανασυνδεθεί; Η ίδια άδεια και ο ίδιος κωδικός εγκατάστασης θα διατηρηθούν. Μετά θα πατήσεις «Έλεγχος / λήψη άδειας» στο POS.`)) return;
-              try {
-                await api(`/api/license-manager/v1/installations/${installation.installationId}/rebind`, 'POST');
-                await refresh();
-                showStatus('Έτοιμο. Στην ίδια συσκευή πάτησε τώρα «Έλεγχος / λήψη άδειας μέσω Internet» στο POS.');
-              } catch (error) { showStatus(error.message, true); }
+              if (!confirm(`Να επιτραπεί επανασύνδεση στον υπολογιστή «${installation.machineName}»;`)) return;
+              try { await api(`/api/license-manager/v1/installations/${installation.installationId}/rebind`, 'POST'); await refreshDashboard(); toast('Έτοιμο. Ολοκλήρωσε τη σύνδεση από την ίδια συσκευή.'); }
+              catch (error) { toast(error.message, true); }
             });
             actions.append(rebind);
           }
-          const detach = node('button', 'Ανάκληση από αυτή τη συσκευή', 'danger'); detach.type = 'button';
+          const detach = element('button', 'btn danger small'); detach.type = 'button'; detach.textContent = 'Ανάκληση συσκευής';
           detach.addEventListener('click', async () => {
-            if (!confirm(`Να ανακληθεί η άδεια από το ${installation.machineName};`)) return;
-            try { await api(`/api/license-manager/v1/installations/${installation.installationId}/detach`, 'POST'); await refresh(); }
-            catch (error) { showStatus(error.message, true); }
+            if (!confirm(`Να ανακληθεί η άδεια από τον υπολογιστή «${installation.machineName}»;`)) return;
+            try { await api(`/api/license-manager/v1/installations/${installation.installationId}/detach`, 'POST'); await refreshDashboard(); toast('Η συσκευή αποσυνδέθηκε από την άδεια.'); }
+            catch (error) { toast(error.message, true); }
           });
           actions.append(detach);
         }
-        card.append(actions); root.append(card);
+        card.append(actions); list.append(card);
       }
+      content.replaceChildren(heading, list);
     }
 
-    byId('connect').addEventListener('click', async () => {
-      managerPassword = byId('password').value;
-      if (!managerPassword) { showStatus('Γράψε τον κωδικό License Manager.', true); return; }
-      try { await refresh(); }
-      catch (error) { managerPassword = ''; showStatus(error.message, true); }
+    document.querySelectorAll('.nav-item').forEach(nav => nav.addEventListener('click', () => { activeView = nav.dataset.view; drawView(); }));
+    byId('customer-search').addEventListener('input', () => { if (activeView === 'customers') drawCustomers(); });
+    byId('logout').addEventListener('click', () => {
+      managerPassword = ''; dashboard = { customers: [], licenses: [], installations: [], editions: [] };
+      byId('app').classList.add('hidden'); byId('login-screen').classList.remove('hidden'); byId('password').value = ''; byId('password').focus();
     });
-    byId('create-license').addEventListener('submit', async event => {
+    byId('login-form').addEventListener('submit', async event => {
       event.preventDefault();
-      const form = new FormData(event.currentTarget);
+      const button = byId('login-button'); button.disabled = true; button.textContent = 'Σύνδεση…';
+      byId('login-error').textContent = '';
+      managerPassword = byId('password').value;
       try {
-        await api('/api/license-manager/v1/licenses', 'POST', {
-          customerName: form.get('customerName'), vatNumber: form.get('vatNumber'),
-          expiresAtUtc: dateToUtc(form.get('expiresAt')), maxInstallations: Number(form.get('maxInstallations'))
-        });
-        event.currentTarget.reset(); event.currentTarget.elements.maxInstallations.value = '1'; await refresh();
-      } catch (error) { showStatus(error.message, true); }
+        await refreshDashboard();
+        byId('login-screen').classList.add('hidden'); byId('app').classList.remove('hidden');
+        selectedCustomerId = dashboard.customers.find(item => item.isActive)?.id || dashboard.customers[0]?.id || null;
+        drawView();
+      } catch (error) {
+        managerPassword = '';
+        byId('login-error').textContent = error.message === 'Αποτυχία αιτήματος (401).' ? 'Ο κωδικός δεν είναι σωστός.' : error.message;
+      } finally { button.disabled = false; button.textContent = 'Σύνδεση'; }
     });
   </script>
 </body>

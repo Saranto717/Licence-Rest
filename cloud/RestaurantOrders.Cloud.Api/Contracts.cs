@@ -46,8 +46,21 @@ public sealed class CloudLicensePayload
 public sealed record CreateCloudLicenseRequest(string CustomerName, string? VatNumber, DateTimeOffset? ExpiresAtUtc, int MaxInstallations = 1);
 public sealed record RenewCloudLicenseRequest(DateTimeOffset? ExpiresAtUtc);
 public sealed record AssignCloudLicenseRequest(Guid LicenseId);
-public sealed record ManagedLicenseView(Guid Id, string CustomerName, string VatNumber, string Status,
+public sealed record CreateCloudCustomerRequest(string? StoreIdentifier, string? ShopName, string? ResellerName, string? VatNumber);
+public sealed record UpdateCloudCustomerRequest(string? StoreIdentifier, string? ShopName, string? ResellerName, string? VatNumber);
+public sealed record CreateCloudLicenseForCustomerRequest(Guid EditionId, DateTimeOffset? ExpiresAtUtc);
+public sealed record UpsertCloudLicenseEditionRequest(string? Name, int MaxInstallations, int DefaultDurationMonths, bool IsActive = true);
+public sealed record UpdateManagedLicenseRequest(Guid EditionId, DateTimeOffset? ExpiresAtUtc);
+public sealed record ManagedCustomerView(Guid Id, string StoreIdentifier, string ShopName, string ResellerName,
+    string VatNumber, bool IsActive, int ActiveLicenseCount, int ActiveInstallationCount, DateTime CreatedAtUtc);
+public sealed record ManagedLicenseEditionView(Guid Id, string Name, int MaxInstallations,
+    int DefaultDurationMonths, bool IsActive, int LicenseCount);
+public sealed record ManagedLicenseView(Guid Id, Guid CustomerId, string StoreIdentifier, string CustomerName,
+    string ResellerName, string VatNumber, Guid? EditionId, string? EditionName, string Status,
     DateTime? ExpiresAtUtc, int MaxInstallations, int ActiveInstallations, DateTime CreatedAtUtc);
 public sealed record ManagedInstallationView(Guid InstallationId, string MachineName, DateTime FirstSeenAtUtc,
-    DateTime LastSeenAtUtc, Guid? LicenseId, string? CustomerName, string? LicenseStatus, bool IsAssigned,
-    bool RebindPending);
+    DateTime LastSeenAtUtc, Guid? LicenseId, string? CustomerName, string? StoreIdentifier,
+    string? LicenseStatus, bool IsAssigned, bool RebindPending);
+public sealed record LicenseManagerDashboard(IReadOnlyList<ManagedCustomerView> Customers,
+    IReadOnlyList<ManagedLicenseView> Licenses, IReadOnlyList<ManagedInstallationView> Installations,
+    IReadOnlyList<ManagedLicenseEditionView> Editions);

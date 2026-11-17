@@ -1,53 +1,49 @@
-# Cloud deployment
+# Ανάπτυξη Cloud και License Manager
 
-## Ροή έκδοσης
+## Τι περιλαμβάνει
 
-- Το `Dockerfile` στη ρίζα χτίζει μόνο το cloud API.
-- Το GitHub Actions χτίζει το Docker image και το δημοσιεύει στο GHCR.
-- Το `docker-compose.yml` στη ρίζα δεν κάνει build· κάνει pull το image από το GHCR και ξεκινά το API μαζί με την PostgreSQL.
-- Push στο `main` φτιάχνει δοκιμαστικό image με tags `main` και commit SHA.
-- Git tag έκδοσης όπως `v17.3.113` δημιουργεί τα images `:v17.3.113` και `:latest`. Με ενεργό deployment, το Actions συνδέεται μέσω SSH και αναβαθμίζει τον VPS με το `:latest`.
+- Καρτέλες πελατών με αναγνωριστικό καταστήματος, ονομασία καταστήματος, μεταπωλητή και ΑΦΜ.
+- Εκδόσεις άδειας με όριο εγκαταστάσεων και προτεινόμενη διάρκεια.
+- Δημιουργία και ανανέωση αδειών, επεξεργασία στοιχείων και ανάκληση.
+- Αρχειοθέτηση πελάτη που ανακαλεί τις άδειές του και διατηρεί τα ιστορικά στοιχεία.
+- Ανάθεση, επανασύνδεση και ανάκληση εγκατάστασης.
 
-Κυκλοφόρησε νέα έκδοση από commit του `main`:
+Η νέα βάση δεδομένων προστίθεται με migration 004. Οι υπάρχουσες άδειες και εγκαταστάσεις διατηρούνται· τα παλιά στοιχεία πελατών μεταφέρονται σε καρτέλες με προσωρινό αναγνωριστικό `LEGACY-...` που μπορείς να αλλάξεις.
 
-```sh
-git tag v17.3.113
-git push origin v17.3.113
-```
+## Ρύθμιση Dockhand μία φορά
 
-Ο αριθμός έκδοσης μπαίνει στο Git tag, όχι στην έκδοση .NET του Dockerfile. Το `latest` σημαίνει την τελευταία έκδοση που προωθήθηκε με version tag.
+Στο Git stack `cloud`:
 
-## Proxy
+1. Άφησε repository branch `main` και compose file `docker-compose.yml`.
+2. Άφησε απενεργοποιημένο το **Build images on deploy**. Το GitHub Actions χτίζει την εικόνα και την ανεβάζει στο GHCR.
+3. Όρισε `CLOUD_IMAGE_TAG=latest`.
+4. Ενεργοποίησε **Enable scheduled sync** και όρισε διάστημα 1–3 λεπτών.
+5. Άφησε απενεργοποιημένο το **Force redeployment**. Το compose έχει `pull_policy: always`, και το release ενημερώνει το `docker-compose.yml` μετά το upload, ώστε το Dockhand να εντοπίσει την αλλαγή και να κάνει μία ανάπτυξη.
+6. Αν το GHCR package είναι ιδιωτικό, πρόσθεσε στο Dockhand registry έναν λογαριασμό με δικαίωμα ανάγνωσης.
 
-Δεν περιλαμβάνεται Caddy. Το Compose δημοσιεύει το API από προεπιλογή μόνο στο `127.0.0.1:8080` του VPS. Ο proxy του IT πρέπει να τερματίζει το HTTPS και να προωθεί τα αιτήματα στο `http://127.0.0.1:8080`. Το δημόσιο URL του proxy είναι η διεύθυνση που χρησιμοποιούν ο installer και ο License Manager.
+Κράτησε τα υπάρχοντα στοιχεία βάσης, `CLOUD_ADMIN_KEY`, `LICENSE_MANAGER_PASSWORD` και το ίδιο RSA signing key. Μην αλλάξεις ή διαγράψεις το signing key: το POS το χρειάζεται για να επαληθεύει τις άδειες που εκδίδει ο server.
 
-Αν ο proxy τρέχει σε Docker ή σε διαφορετικό server, ρύθμισε πρώτα την προσβάσιμη ιδιωτική διεύθυνση του API και το firewall. Μην ανοίξεις τη θύρα 5432 της PostgreSQL στο Internet.
+## Έκδοση και αυτόματη αναβάθμιση
 
-## Εγκατάσταση και αυτόματες ενημερώσεις με Dockhand
+Για κάθε νέα έκδοση:
 
-Το GitHub Actions χτίζει εικόνα για κάθε release tag τύπου `vX.Y.Z` και ανεβάζει την ίδια έκδοση με tag `latest` στο GHCR. Το Compose χρησιμοποιεί αυτό το `latest` tag, οπότε το Dockhand μπορεί να ενημερώνει το stack χωρίς αλλαγή branch.
+1. Ανέβασε τις αλλαγές στο `main`.
+2. Δημιούργησε tag πάνω στο τρέχον `main`, με μορφή `vMAJOR.MINOR.PATCH`, π.χ. `v0.2.0`, και κάνε push το tag.
 
-Στο Git stack `cloud` του Dockhand:
+Το GitHub Actions ελέγχει το tag, χτίζει την εικόνα, δημοσιεύει τα `:v0.2.0` και `:latest` στο GHCR και δημιουργεί αυτόματα το GitHub Release. Μετά ενημερώνει ένα σχόλιο στο `docker-compose.yml` του `main`, ώστε το προγραμματισμένο sync του Dockhand να εντοπίσει την έκδοση, να τραβήξει το νέο `latest` και να αναδημιουργήσει το API container. Η PostgreSQL και το volume `postgres-data` παραμένουν ως έχουν.
 
-1. Άφησε το branch στο `main` και απενεργοποίησε το **Build images on deploy**.
-2. Ενεργοποίησε το **Enable scheduled sync** για το συγκεκριμένο stack.
-3. Στις επιλογές deploy ενεργοποίησε **Re-pull images** και **Force redeployment**. Έτσι, όταν συγχρονίζεται το ίδιο commit, το Dockhand ξανατραβά το `latest` και εφαρμόζει τη νέα εικόνα.
-4. Ρύθμισε το `CLOUD_IMAGE_TAG` σε `latest`.
-5. Αν το GHCR package είναι ιδιωτικό, πρόσθεσε τα στοιχεία ανάγνωσης του GHCR στο Dockhand Registry.
+Το `v0.2` δεν είναι έγκυρο tag για το workflow· χρησιμοποίησε `v0.2.0`.
 
-Για να εκδοθεί ενημέρωση, φτιάξε GitHub Release με tag όπως `v1.0.2` από commit που υπάρχει στο `main`. Το GitHub Actions θα χτίσει και θα δημοσιεύσει τις εικόνες `v1.0.2` και `latest`. Το προγραμματισμένο sync του Dockhand θα τραβήξει το `latest` στην επόμενη εκτέλεση. Δεν αλλάζεις branch για κάθε έκδοση.
+## Σημαντικό για απενεργοποίηση άδειας
 
-Στο Dockhand κράτησε τα παρακάτω ως μεταβλητές/μυστικά του stack. Το `LICENSE_SIGNING_PRIVATE_KEY_B64` πρέπει να είναι Base64 ολόκληρου του υπάρχοντος RSA private-key PEM. Κράτησε το ίδιο κλειδί στις επόμενες εκδόσεις, ώστε να παραμένουν έγκυρες οι άδειες που έχουν ήδη υπογραφεί.
+Η ανάκληση αποθηκεύεται αμέσως στον server. Ένα POS που έχει σύνδεση θα κλειδώσει όταν κάνει τον επόμενο online έλεγχο άδειας. Αν ο υπολογιστής είναι αποσυνδεδεμένος από το Internet, ο server δεν μπορεί να του στείλει την ανάκληση μέχρι να ξανασυνδεθεί· το POS χρησιμοποιεί την τελευταία υπογεγραμμένη offline άδεια μέχρι να λήξει.
 
-- `POSTGRES_DB`
-- `POSTGRES_ADMIN_USER`
-- `POSTGRES_ADMIN_PASSWORD`
-- `CLOUD_APP_USER`
-- `CLOUD_APP_PASSWORD`
-- `CLOUD_ADMIN_KEY`
-- `LICENSE_MANAGER_PASSWORD`
-- `LICENSE_SIGNING_PRIVATE_KEY_B64`
-- `CLOUD_IMAGE_TAG=latest`
+Η διαγραφή πελάτη αρχειοθετεί την καρτέλα και ανακαλεί όλες τις άδειές του. Τα στοιχεία δεν διαγράφονται οριστικά, ώστε να παραμένει το ιστορικό και να μπορεί να γίνει επαναφορά.
 
-Η βάση μένει στο Docker volume `postgres-data` και διατηρείται σε αναβαθμίσεις container. Κράτα ξεχωριστά αντίγραφα ασφαλείας.
+## Δικτυακή πρόσβαση
 
+Το API δημοσιεύεται από προεπιλογή στη διεύθυνση `127.0.0.1:8080` του server. Για πρόσβαση από LAN ή μέσω Internet, άλλαξε `CLOUD_API_BIND_ADDRESS` και ρύθμισε το firewall ή reverse proxy. Η PostgreSQL δεν πρέπει να εκτίθεται στο Internet. Η εφαρμογή POS υποστηρίζει HTTP μόνο για loopback και ιδιωτικά IPv4 δίκτυα· για δημόσια διεύθυνση χρησιμοποίησε HTTPS.
+
+## Ασφάλεια και αντίγραφα
+
+Μην αποθηκεύεις κωδικούς, registry tokens, `.env` ή RSA private keys στο Git. Κράτησε αντίγραφο του PostgreSQL volume και του RSA signing key σε ασφαλές σημείο. Η αλλαγή ή απώλεια του signing key εμποδίζει το POS να επαληθεύσει νέες άδειες.

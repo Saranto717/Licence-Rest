@@ -9,8 +9,12 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   packages: write
+
+concurrency:
+  group: cloud-api-image-publish
+  cancel-in-progress: false
 
 jobs:
   publish:
@@ -24,15 +28,20 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Verify release tag is on main
+      - name: Verify release version and main commit
         if: github.ref_type == 'tag'
         shell: bash
         run: |
-          git fetch origin main:refs/remotes/origin/main
-          git merge-base --is-ancestor "$GITHUB_SHA" refs/remotes/origin/main || {
-            echo "Release tags must point to a commit on main." >&2
+          if [[ ! "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Create a stable release with a version such as v0.2.0." >&2
             exit 1
-          }
+          fi
+          git fetch origin main:refs/remotes/origin/main
+          main_sha="$(git rev-parse refs/remotes/origin/main)"
+          if [[ "$GITHUB_SHA" != "$main_sha" ]]; then
+            echo "Tag the current main commit before creating a release." >&2
+            exit 1
+          fi
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -47,13 +56,9 @@ jobs:
         shell: bash
         run: |
           if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
-            if [[ ! "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
-              echo "Release tag must look like v17.3.113." >&2
-              exit 1
-            fi
             image_tag="$GITHUB_REF_NAME"
           else
-            image_tag="latest"
+            image_tag="main"
           fi
           echo "tag=$image_tag" >> "$GITHUB_OUTPUT"
 
@@ -71,9 +76,9 @@ jobs:
           images: ${{ steps.image.outputs.name }}
           tags: |
             type=ref,event=branch
-            type=ref,event=tag
             type=sha
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' || github.ref_type == 'tag' }}
+            type=raw,value=${{ github.ref_name }},enable=${{ github.ref_type == 'tag' }}
+            type=raw,value=latest,enable=${{ github.ref_type == 'tag' }}
 
       - name: Build and publish image
         uses: docker/build-push-action@v6
@@ -88,4 +93,28 @@ jobs:
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Create GitHub release from version tag
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+
+      - name: Mark published image in main to trigger Dockhand sync
+        if: github.ref_type == 'tag'
+        shell: bash
+        run: |
+          git fetch origin main
+          git switch --force-create main origin/main
+          sed -i '/^# Published cloud API release: /d' docker-compose.yml
+          printf '\n# Published cloud API release: %s\n' "$GITHUB_REF_NAME" >> docker-compose.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docker-compose.yml
+          if git diff --cached --quiet; then
+            echo "The compose release marker is already current."
+            exit 0
+          fi
+          git commit -m "chore: mark cloud API release $GITHUB_REF_NAME"
+          git push origin HEAD:main
 

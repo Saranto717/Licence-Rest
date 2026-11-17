@@ -43,7 +43,14 @@ builder.Services.AddSingleton<CloudLicenseDatabase>();
 builder.Services.AddSingleton(new LicenseSigner(licenseSigningPrivateKey));
 
 var app = builder.Build();
-app.UseStaticFiles();
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = context =>
+    {
+        if (string.Equals(context.File.Name, "license-manager.html", StringComparison.OrdinalIgnoreCase))
+            context.Context.Response.Headers.CacheControl = "no-store, no-cache, must-revalidate";
+    }
+});
 
 await using (var scope = app.Services.CreateAsyncScope())
 {
@@ -185,7 +192,143 @@ licenseManager.AddEndpointFilter(async (context, next) =>
 licenseManager.MapGet("/dashboard", async (CloudLicenseDatabase database, CancellationToken cancellationToken) =>
 {
     var dashboard = await database.GetDashboardAsync(cancellationToken);
-    return Results.Ok(new { licenses = dashboard.Licenses, installations = dashboard.Installations });
+    return Results.Ok(new
+    {
+        customers = dashboard.Customers,
+        licenses = dashboard.Licenses,
+        installations = dashboard.Installations,
+        editions = dashboard.Editions
+    });
+});
+
+licenseManager.MapPost("/customers", async (
+    CreateCloudCustomerRequest? body,
+    CloudLicenseDatabase database,
+    CancellationToken cancellationToken) =>
+{
+    var storeIdentifier = body?.StoreIdentifier?.Trim();
+    var shopName = body?.ShopName?.Trim();
+    var resellerName = body?.ResellerName?.Trim();
+    var vatNumber = body?.VatNumber?.Trim() ?? "";
+    if (string.IsNullOrWhiteSpace(storeIdentifier) || storeIdentifier.Length > 80 ||
+        string.IsNullOrWhiteSpace(shopName) || shopName.Length > 160 ||
+        string.IsNullOrWhiteSpace(resellerName) || resellerName.Length > 160 || vatNumber.Length > 32)
+        return Results.BadRequest(new { error = "Συμπλήρωσε αναγνωριστικό καταστήματος, όνομα καταστήματος και μεταπωλητή. Το ΑΦΜ πρέπει να είναι έως 32 χαρακτήρες." });
+
+    try
+    {
+        var customerId = await database.CreateCustomerAsync(storeIdentifier, shopName, resellerName, vatNumber, cancellationToken);
+        return Results.Created($"/api/license-manager/v1/customers/{customerId}", new { customerId });
+    }
+    catch (PostgresException exception) when (exception.SqlState == PostgresErrorCodes.UniqueViolation)
+    {
+        return Results.Conflict(new { error = "Το αναγνωριστικό καταστήματος χρησιμοποιείται ήδη." });
+    }
+});
+
+licenseManager.MapPut("/customers/{customerId:guid}", async (
+    Guid customerId,
+    UpdateCloudCustomerRequest? body,
+    CloudLicenseDatabase database,
+    CancellationToken cancellationToken) =>
+{
+    var storeIdentifier = body?.StoreIdentifier?.Trim();
+    var shopName = body?.ShopName?.Trim();
+    var resellerName = body?.ResellerName?.Trim();
+    var vatNumber = body?.VatNumber?.Trim() ?? "";
+    if (string.IsNullOrWhiteSpace(storeIdentifier) || storeIdentifier.Length > 80 ||
+        string.IsNullOrWhiteSpace(shopName) || shopName.Length > 160 ||
+        string.IsNullOrWhiteSpace(resellerName) || resellerName.Length > 160 || vatNumber.Length > 32)
+        return Results.BadRequest(new { error = "Συμπλήρωσε αναγνωριστικό καταστήματος, όνομα καταστήματος και μεταπωλητή. Το ΑΦΜ πρέπει να είναι έως 32 χαρακτήρες." });
+
+    try
+    {
+        var updated = await database.UpdateCustomerAsync(customerId, storeIdentifier, shopName, resellerName, vatNumber, cancellationToken);
+        return updated ? Results.Ok(new { status = "updated" }) : Results.NotFound(new { error = "Δεν βρέθηκε ενεργός πελάτης." });
+    }
+    catch (PostgresException exception) when (exception.SqlState == PostgresErrorCodes.UniqueViolation)
+    {
+        return Results.Conflict(new { error = "Το αναγνωριστικό καταστήματος χρησιμοποιείται ήδη." });
+    }
+});
+
+licenseManager.MapDelete("/customers/{customerId:guid}", async (
+    Guid customerId,
+    CloudLicenseDatabase database,
+    CancellationToken cancellationToken) =>
+{
+    var deleted = await database.DeleteCustomerAsync(customerId, cancellationToken);
+    return deleted
+        ? Results.Ok(new { status = "deleted", message = "Ο πελάτης αρχειοθετήθηκε και οι άδειές του ανακλήθηκαν." })
+        : Results.NotFound(new { error = "Δεν βρέθηκε ενεργός πελάτης." });
+});
+
+licenseManager.MapPost("/customers/{customerId:guid}/restore", async (
+    Guid customerId,
+    CloudLicenseDatabase database,
+    CancellationToken cancellationToken) =>
+{
+    var restored = await database.RestoreCustomerAsync(customerId, cancellationToken);
+    return restored
+        ? Results.Ok(new { status = "restored", message = "Ο πελάτης επανενεργοποιήθηκε. Οι άδειες παραμένουν ανακλημένες μέχρι να ανανεωθούν." })
+        : Results.NotFound(new { error = "Δεν βρέθηκε αρχειοθετημένος πελάτης." });
+});
+
+licenseManager.MapPost("/customers/{customerId:guid}/licenses", async (
+    Guid customerId,
+    CreateCloudLicenseForCustomerRequest? body,
+    CloudLicenseDatabase database,
+    CancellationToken cancellationToken) =>
+{
+    var expiresAtUtc = body?.ExpiresAtUtc?.UtcDateTime;
+    if (body is null || body.EditionId == Guid.Empty || expiresAtUtc is null || expiresAtUtc <= DateTime.UtcNow)
+        return Results.BadRequest(new { error = "Επίλεξε έκδοση άδειας και ημερομηνία λήξης στο μέλλον." });
+    var (licenseId, error) = await database.CreateCustomerLicenseAsync(customerId, body.EditionId, expiresAtUtc.Value, cancellationToken);
+    if (licenseId is null)
+        return Results.Conflict(new { error = error == "customer-or-edition-not-found" ? "Ο πελάτης δεν είναι ενεργός ή η έκδοση άδειας δεν είναι διαθέσιμη." : "Δεν ήταν δυνατή η δημιουργία άδειας." });
+    return Results.Created($"/api/license-manager/v1/licenses/{licenseId}", new { licenseId });
+});
+
+licenseManager.MapPost("/license-editions", async (
+    UpsertCloudLicenseEditionRequest? body,
+    CloudLicenseDatabase database,
+    CancellationToken cancellationToken) =>
+{
+    var name = body?.Name?.Trim();
+    if (string.IsNullOrWhiteSpace(name) || name.Length > 80 ||
+        body!.MaxInstallations is < 1 or > 100 || body.DefaultDurationMonths is < 1 or > 120)
+        return Results.BadRequest(new { error = "Συμπλήρωσε όνομα έκδοσης, 1–100 εγκαταστάσεις και διάρκεια 1–120 μηνών." });
+    try
+    {
+        var editionId = await database.CreateLicenseEditionAsync(name, body.MaxInstallations, body.DefaultDurationMonths, cancellationToken);
+        return Results.Created($"/api/license-manager/v1/license-editions/{editionId}", new { editionId });
+    }
+    catch (PostgresException exception) when (exception.SqlState == PostgresErrorCodes.UniqueViolation)
+    {
+        return Results.Conflict(new { error = "Υπάρχει ήδη έκδοση με αυτό το όνομα." });
+    }
+});
+
+licenseManager.MapPut("/license-editions/{editionId:guid}", async (
+    Guid editionId,
+    UpsertCloudLicenseEditionRequest? body,
+    CloudLicenseDatabase database,
+    CancellationToken cancellationToken) =>
+{
+    var name = body?.Name?.Trim();
+    if (string.IsNullOrWhiteSpace(name) || name.Length > 80 ||
+        body!.MaxInstallations is < 1 or > 100 || body.DefaultDurationMonths is < 1 or > 120)
+        return Results.BadRequest(new { error = "Συμπλήρωσε όνομα έκδοσης, 1–100 εγκαταστάσεις και διάρκεια 1–120 μηνών." });
+    try
+    {
+        var updated = await database.UpdateLicenseEditionAsync(editionId, name, body.MaxInstallations,
+            body.DefaultDurationMonths, body.IsActive, cancellationToken);
+        return updated ? Results.Ok(new { status = "updated" }) : Results.NotFound(new { error = "Δεν βρέθηκε η έκδοση άδειας." });
+    }
+    catch (PostgresException exception) when (exception.SqlState == PostgresErrorCodes.UniqueViolation)
+    {
+        return Results.Conflict(new { error = "Υπάρχει ήδη έκδοση με αυτό το όνομα." });
+    }
 });
 
 licenseManager.MapPost("/licenses", async (
@@ -219,6 +362,25 @@ licenseManager.MapPut("/licenses/{licenseId:guid}/renew", async (
         return Results.BadRequest(new { error = "Η ημερομηνία λήξης πρέπει να είναι στο μέλλον." });
     var renewed = await database.RenewLicenseAsync(licenseId, expiresAtUtc, cancellationToken);
     return renewed ? Results.Ok(new { status = "active" }) : Results.NotFound(new { error = "Δεν βρέθηκε η άδεια." });
+});
+
+licenseManager.MapPut("/licenses/{licenseId:guid}", async (
+    Guid licenseId,
+    UpdateManagedLicenseRequest? body,
+    CloudLicenseDatabase database,
+    CancellationToken cancellationToken) =>
+{
+    var expiresAtUtc = body?.ExpiresAtUtc?.UtcDateTime;
+    if (body is null || body.EditionId == Guid.Empty || expiresAtUtc is null || expiresAtUtc <= DateTime.UtcNow)
+        return Results.BadRequest(new { error = "Επίλεξε έκδοση άδειας και ημερομηνία λήξης στο μέλλον." });
+    var error = await database.UpdateLicenseTermsAsync(licenseId, body.EditionId, expiresAtUtc.Value, cancellationToken);
+    return error switch
+    {
+        null => Results.Ok(new { status = "updated" }),
+        "edition-not-found" => Results.Conflict(new { error = "Η έκδοση άδειας δεν είναι πλέον διαθέσιμη." }),
+        "installation-limit" => Results.Conflict(new { error = "Η νέα έκδοση επιτρέπει λιγότερες εγκαταστάσεις από όσες είναι ήδη δεμένες." }),
+        _ => Results.NotFound(new { error = "Δεν βρέθηκε ενεργή άδεια πελάτη." })
+    };
 });
 
 licenseManager.MapPost("/licenses/{licenseId:guid}/revoke", async (
