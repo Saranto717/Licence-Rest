@@ -47,13 +47,19 @@ public sealed class CloudLicensePayload
 public sealed record CreateCloudLicenseRequest(string CustomerName, string? VatNumber, DateTimeOffset? ExpiresAtUtc, int MaxInstallations = 1);
 public sealed record RenewCloudLicenseRequest(DateTimeOffset? ExpiresAtUtc);
 public sealed record AssignCloudLicenseRequest(Guid LicenseId);
-public sealed record CreateCloudCustomerRequest(string? StoreIdentifier, string? ShopName, string? ResellerName, string? VatNumber);
-public sealed record UpdateCloudCustomerRequest(string? StoreIdentifier, string? ShopName, string? ResellerName, string? VatNumber);
+public sealed record CreateCloudCustomerRequest(string? StoreIdentifier, string? ShopName, string? ResellerName, string? VatNumber, Guid? CategoryId = null);
+public sealed record UpdateCloudCustomerRequest(string? StoreIdentifier, string? ShopName, string? ResellerName, string? VatNumber, Guid? CategoryId = null);
+public sealed record CreateLicenseManagerCategoryRequest(string? Name);
+public sealed record UpdateLicenseManagerCategoryRequest(string? Name);
 public sealed record CreateCloudLicenseForCustomerRequest(Guid EditionId, DateTimeOffset? ExpiresAtUtc);
 public sealed record UpsertCloudLicenseEditionRequest(string? Name, int MaxInstallations, int DefaultDurationMonths, bool IsActive = true);
 public sealed record UpdateManagedLicenseRequest(Guid EditionId, DateTimeOffset? ExpiresAtUtc);
 public sealed record ManagedCustomerView(Guid Id, string StoreIdentifier, string ShopName, string ResellerName,
-    string VatNumber, bool IsActive, int ActiveLicenseCount, int ActiveInstallationCount, DateTime CreatedAtUtc);
+    string VatNumber, bool IsActive, int ActiveLicenseCount, int ActiveInstallationCount, DateTime CreatedAtUtc,
+    Guid? CategoryId = null, string? CategoryName = null);
+public sealed record ManagedLicenseManagerCategoryView(Guid Id, string Name, int CustomerCount, DateTime CreatedAtUtc);
+public sealed record ManagedCustomerAuditView(long Id, Guid CustomerId, string Action, DateTime CreatedAtUtc,
+    Guid? LicenseId, Guid? InstallationId);
 public sealed record ManagedLicenseEditionView(Guid Id, string Name, int MaxInstallations,
     int DefaultDurationMonths, bool IsActive, int LicenseCount);
 public sealed record ManagedLicenseView(Guid Id, Guid CustomerId, string StoreIdentifier, string CustomerName,
@@ -64,4 +70,6 @@ public sealed record ManagedInstallationView(Guid InstallationId, string Machine
     string? LicenseStatus, bool IsAssigned, bool RebindPending);
 public sealed record LicenseManagerDashboard(IReadOnlyList<ManagedCustomerView> Customers,
     IReadOnlyList<ManagedLicenseView> Licenses, IReadOnlyList<ManagedInstallationView> Installations,
-    IReadOnlyList<ManagedLicenseEditionView> Editions);
+    IReadOnlyList<ManagedLicenseEditionView> Editions,
+    IReadOnlyList<ManagedLicenseManagerCategoryView> Categories,
+    IReadOnlyList<ManagedCustomerAuditView> Audit);

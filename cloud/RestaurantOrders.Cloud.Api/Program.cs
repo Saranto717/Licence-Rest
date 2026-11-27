@@ -285,8 +285,60 @@ licenseManager.MapGet("/dashboard", async (CloudLicenseDatabase database, Cancel
         customers = dashboard.Customers,
         licenses = dashboard.Licenses,
         installations = dashboard.Installations,
-        editions = dashboard.Editions
+        editions = dashboard.Editions,
+        categories = dashboard.Categories,
+        audit = dashboard.Audit
     });
+});
+
+licenseManager.MapPost("/categories", async (
+    CreateLicenseManagerCategoryRequest? body,
+    CloudLicenseDatabase database,
+    CancellationToken cancellationToken) =>
+{
+    var name = body?.Name?.Trim();
+    if (string.IsNullOrWhiteSpace(name) || name.Length > 80)
+        return Results.BadRequest(new { error = "Το όνομα κατηγορίας είναι υποχρεωτικό και πρέπει να είναι έως 80 χαρακτήρες." });
+    try
+    {
+        var categoryId = await database.CreateCategoryAsync(name, cancellationToken);
+        return Results.Created($"/api/license-manager/v1/categories/{categoryId}", new { categoryId });
+    }
+    catch (PostgresException exception) when (exception.SqlState == PostgresErrorCodes.UniqueViolation)
+    {
+        return Results.Conflict(new { error = "Υπάρχει ήδη κατηγορία με αυτό το όνομα." });
+    }
+});
+
+licenseManager.MapPut("/categories/{categoryId:guid}", async (
+    Guid categoryId,
+    UpdateLicenseManagerCategoryRequest? body,
+    CloudLicenseDatabase database,
+    CancellationToken cancellationToken) =>
+{
+    var name = body?.Name?.Trim();
+    if (string.IsNullOrWhiteSpace(name) || name.Length > 80)
+        return Results.BadRequest(new { error = "Το όνομα κατηγορίας είναι υποχρεωτικό και πρέπει να είναι έως 80 χαρακτήρες." });
+    try
+    {
+        var updated = await database.UpdateCategoryAsync(categoryId, name, cancellationToken);
+        return updated ? Results.Ok(new { status = "updated" }) : Results.NotFound(new { error = "Δεν βρέθηκε η κατηγορία." });
+    }
+    catch (PostgresException exception) when (exception.SqlState == PostgresErrorCodes.UniqueViolation)
+    {
+        return Results.Conflict(new { error = "Υπάρχει ήδη κατηγορία με αυτό το όνομα." });
+    }
+});
+
+licenseManager.MapDelete("/categories/{categoryId:guid}", async (
+    Guid categoryId,
+    CloudLicenseDatabase database,
+    CancellationToken cancellationToken) =>
+{
+    var deleted = await database.DeleteCategoryAsync(categoryId, cancellationToken);
+    return deleted
+        ? Results.Ok(new { status = "deleted", message = "Η κατηγορία διαγράφηκε. Τα καταστήματα που την είχαν θα μείνουν χωρίς κατηγορία." })
+        : Results.NotFound(new { error = "Δεν βρέθηκε η κατηγορία." });
 });
 
 licenseManager.MapPost("/customers", async (
@@ -305,12 +357,17 @@ licenseManager.MapPost("/customers", async (
 
     try
     {
-        var customerId = await database.CreateCustomerAsync(storeIdentifier, shopName, resellerName, vatNumber, cancellationToken);
+        var customerId = await database.CreateCustomerAsync(storeIdentifier, shopName, resellerName, vatNumber,
+            body?.CategoryId, cancellationToken);
         return Results.Created($"/api/license-manager/v1/customers/{customerId}", new { customerId });
     }
     catch (PostgresException exception) when (exception.SqlState == PostgresErrorCodes.UniqueViolation)
     {
         return Results.Conflict(new { error = "Το αναγνωριστικό καταστήματος χρησιμοποιείται ήδη." });
+    }
+    catch (PostgresException exception) when (exception.SqlState == PostgresErrorCodes.ForeignKeyViolation)
+    {
+        return Results.BadRequest(new { error = "Η κατηγορία δεν υπάρχει πλέον. Ανανεώστε τη σελίδα και δοκιμάστε ξανά." });
     }
 });
 
@@ -331,12 +388,17 @@ licenseManager.MapPut("/customers/{customerId:guid}", async (
 
     try
     {
-        var updated = await database.UpdateCustomerAsync(customerId, storeIdentifier, shopName, resellerName, vatNumber, cancellationToken);
+        var updated = await database.UpdateCustomerAsync(customerId, storeIdentifier, shopName, resellerName, vatNumber,
+            body?.CategoryId, cancellationToken);
         return updated ? Results.Ok(new { status = "updated" }) : Results.NotFound(new { error = "Δεν βρέθηκε ενεργός πελάτης." });
     }
     catch (PostgresException exception) when (exception.SqlState == PostgresErrorCodes.UniqueViolation)
     {
         return Results.Conflict(new { error = "Το αναγνωριστικό καταστήματος χρησιμοποιείται ήδη." });
+    }
+    catch (PostgresException exception) when (exception.SqlState == PostgresErrorCodes.ForeignKeyViolation)
+    {
+        return Results.BadRequest(new { error = "Η κατηγορία δεν υπάρχει πλέον. Ανανεώστε τη σελίδα και δοκιμάστε ξανά." });
     }
 });
 
