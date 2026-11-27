@@ -16,8 +16,8 @@
       --ink: #172033;
       --muted: #71809a;
       --line: #e4e9f2;
-      --blue: #315bd6;
-      --blue-dark: #2549b7;
+      --blue: #0f8275;
+      --blue-dark: #0b6d63;
       --nav: #111b32;
       --green: #15845b;
       --red: #bb352f;
@@ -43,7 +43,7 @@
     .nav-group { display: grid; gap: 3px; }
     .nav-item { display: flex; width: 100%; align-items: center; gap: 12px; padding: 11px 12px; border: 0; border-radius: 11px; color: #aab8d1; background: transparent; text-align: left; transition: .16s ease; }
     .nav-item:hover { color: white; background: #ffffff0e; }
-    .nav-item.active { color: white; background: #315bd6; box-shadow: 0 8px 18px #07112755; }
+    .nav-item.active { color: white; background: var(--blue); box-shadow: 0 8px 18px #07112755; }
     .nav-parent.parent-open { color: white; background: #ffffff0b; }
     .nav-sublist { display: grid; gap: 3px; margin-left: 16px; padding-left: 11px; border-left: 1px solid #ffffff20; }
     .nav-item.nav-subitem { padding: 9px 11px; font-size: .8rem; }
@@ -72,19 +72,20 @@
     .section-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 14px; margin: 0 0 15px; }
     .section-heading h2 { margin: 0; font-size: 1.15rem; letter-spacing: -.025em; }
     .section-heading p { margin: 5px 0 0; color: var(--muted); font-size: .83rem; }
-    .customer-layout { display: grid; grid-template-columns: minmax(245px, 315px) minmax(0, 1fr); gap: 16px; align-items: start; }
+    .customer-layout { display: grid; grid-template-columns: minmax(270px, 350px) minmax(0, 1fr); gap: 16px; align-items: stretch; }
     .panel { min-width: 0; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); box-shadow: 0 4px 15px #26385a07; }
     .panel-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 16px 17px; border-bottom: 1px solid var(--line); }
     .panel-head h2, .panel-head h3 { margin: 0; font-size: .95rem; }
     .panel-body { padding: 17px; }
-    .customer-list { display: grid; max-height: calc(100vh - 320px); min-height: 220px; overflow: auto; padding: 7px; }
+    .customer-list { display: grid; max-height: calc(100vh - 390px); min-height: 220px; overflow: auto; padding: 7px; align-content: start; }
     .customer-row { display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 10px; width: 100%; padding: 11px 10px; border: 0; border-radius: 11px; background: transparent; text-align: left; }
     .customer-row:hover { background: #f5f7fc; }
-    .customer-row.selected { background: #edf2ff; }
-    .avatar { display: grid; width: 36px; height: 36px; place-items: center; border-radius: 11px; color: #315bd6; background: #e2eaff; font-weight: 800; }
+    .customer-row.selected { background: #eef8f6; }
+    .avatar { display: grid; width: 36px; height: 36px; place-items: center; border-radius: 11px; color: var(--blue); background: #e6f5f1; font-weight: 800; }
     .customer-row strong { display: block; overflow: hidden; color: var(--ink); font-size: .83rem; text-overflow: ellipsis; white-space: nowrap; }
     .customer-row small { display: block; overflow: hidden; margin-top: 4px; color: var(--muted); font-size: .72rem; text-overflow: ellipsis; white-space: nowrap; }
-    .customer-row .mini-status { display: block; margin-top: 5px; color: #16845c; font-size: .66rem; font-weight: 800; text-transform: uppercase; }
+    .customer-row-meta { display: block; margin-top: 5px; color: #64748b; font-size: .7rem; }
+    .customer-row .mini-status { display: inline-flex; margin-top: 7px; padding: 3px 8px; border-radius: 20px; color: #14734f; background: #e7f7ef; font-size: .65rem; font-weight: 800; }
     .customer-row.archived .mini-status { color: #a05b48; }
     .profile-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
     .profile-title { display: flex; align-items: center; gap: 12px; min-width: 0; }
@@ -96,7 +97,7 @@
     .field { display: grid; gap: 6px; min-width: 0; color: #4e5c73; font-size: .76rem; font-weight: 750; }
     .field.full { grid-column: 1 / -1; }
     input, select { width: 100%; min-height: 42px; padding: 9px 11px; border: 1px solid #d9e0eb; border-radius: 9px; outline: none; color: var(--ink); background: white; transition: border-color .15s, box-shadow .15s; }
-    input:focus, select:focus { border-color: #6c8df0; box-shadow: 0 0 0 3px #315bd61c; }
+    input:focus, select:focus { border-color: #64aa9f; box-shadow: 0 0 0 3px #0f82751c; }
     input:disabled, select:disabled { color: #7d889c; background: #f4f6fa; }
     .btn { min-height: 40px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 8px 13px; border: 1px solid transparent; border-radius: 9px; color: white; background: var(--blue); font-size: .8rem; font-weight: 800; transition: .15s ease; }
     .btn:hover { background: var(--blue-dark); transform: translateY(-1px); }
@@ -128,6 +129,44 @@
     .empty-state strong { display: block; margin-bottom: 4px; color: #314057; }
     .archive-toggle { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: .75rem; font-weight: 650; }
     .archive-toggle input { width: 16px; min-height: 16px; margin: 0; accent-color: var(--blue); }
+    .customer-filters { display: flex; justify-content: flex-end; margin: -4px 0 13px; }
+    .customer-filters .field { width: min(260px, 100%); }
+    .profile-tabs { display: flex; gap: 4px; overflow-x: auto; margin: 0 0 17px; border-bottom: 1px solid var(--line); scrollbar-width: thin; }
+    .profile-tab { flex: 0 0 auto; padding: 11px 13px; border: 0; border-bottom: 3px solid transparent; color: #68768c; background: transparent; font-size: .78rem; font-weight: 750; }
+    .profile-tab:hover { color: var(--blue); background: #f6f9fc; }
+    .profile-tab.active { border-bottom-color: var(--blue); color: var(--blue); }
+    .profile-tab-content { min-height: 210px; }
+    .profile-save-row { display: flex; flex-direction: row; justify-content: flex-end; gap: 8px; }
+    .quick-links { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 17px; }
+    .quick-link { display: flex; min-width: 0; align-items: center; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; color: var(--ink); background: #fbfcff; text-align: left; }
+    .quick-link:hover { border-color: #b8d5d0; background: #f2fbf8; }
+    .quick-link strong, .quick-link small { display: block; }
+    .quick-link small { margin-top: 4px; color: var(--muted); font-size: .68rem; line-height: 1.4; }
+    .quick-link-icon { color: var(--blue); font-size: 1.15rem; }
+    .category-create { max-width: 780px; }
+    .category-create-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 12px; }
+    .category-list-heading { margin-top: 24px; }
+    .category-list-heading h2 { margin: 0; font-size: 1.05rem; }
+    .category-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 13px; }
+    .category-card { display: grid; gap: 13px; padding: 16px; }
+    .category-card-title { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: .75rem; font-weight: 700; }
+    .category-icon { display: grid; width: 36px; height: 36px; place-items: center; border-radius: 11px; color: var(--blue); background: #e6f5f1; font-size: 1.1rem; }
+    .category-actions { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; }
+    .overview-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 13px; }
+    .overview-card { display: grid; gap: 10px; padding: 18px; }
+    .overview-card h3 { margin: 0; font-size: .95rem; }
+    .overview-card p { margin: 0; color: var(--muted); font-size: .8rem; }
+    .overview-icon { display: grid; width: 40px; height: 40px; place-items: center; border-radius: 13px; color: var(--blue); background: #e6f5f1; font-size: 1.15rem; }
+    .compact-heading { align-items: center; margin-bottom: 14px; }
+    .compact-heading h3 { margin: 0; font-size: .95rem; }
+    .compact-heading p { margin: 5px 0 0; color: var(--muted); font-size: .75rem; }
+    .compact-installation { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+    .history-list { display: grid; gap: 0; }
+    .history-row { display: grid; grid-template-columns: 34px minmax(0, 1fr); align-items: start; gap: 10px; padding: 12px 3px; border-bottom: 1px solid var(--line); }
+    .history-icon { display: grid; width: 30px; height: 30px; place-items: center; border-radius: 50%; color: var(--blue); background: #e6f5f1; font-weight: 900; }
+    .history-row strong, .history-row small { display: block; }
+    .history-row strong { font-size: .8rem; }
+    .history-row small { margin-top: 4px; color: var(--muted); font-size: .7rem; overflow-wrap: anywhere; }
     .edition-grid, .installation-grid { display: grid; gap: 12px; }
     .edition-card { display: grid; grid-template-columns: minmax(140px, 1.4fr) minmax(125px, .8fr) minmax(125px, .8fr) auto auto; gap: 12px; align-items: end; padding: 15px; }
     .edition-card .field { font-size: .7rem; }
@@ -154,6 +193,8 @@
     .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
     @media (max-width: 1100px) {
       .app-shell { grid-template-columns: 220px minmax(0, 1fr); }
+      .overview-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .quick-links { grid-template-columns: 1fr; }
       .edition-card { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .edition-card .edition-save { grid-column: 2; justify-self: end; }
     }
@@ -175,9 +216,10 @@
       .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
       .stat-card { min-height: 76px; padding: 12px; }
       .customer-layout { grid-template-columns: 1fr; }
-      .customer-list { max-height: 250px; min-height: 120px; }
+      .customer-list { max-height: 290px; min-height: 120px; }
       .profile-header { flex-direction: column; }
       .profile-actions { justify-content: flex-start; }
+      .category-create { max-width: none; }
     }
     @media (max-width: 480px) {
       .content-wrap { padding-right: 12px; padding-left: 12px; }
@@ -190,6 +232,9 @@
       .panel-body { padding: 13px; }
       .form-grid, .license-fields { grid-template-columns: 1fr; }
       .field.full { grid-column: auto; }
+      .category-create-form { grid-template-columns: 1fr; }
+      .category-create-form > .btn { width: 100%; }
+      .overview-grid { grid-template-columns: 1fr; }
       .license-card-top { flex-direction: column; }
       .edition-card { grid-template-columns: 1fr; }
       .edition-card .edition-save { grid-column: auto; justify-self: stretch; }
@@ -201,7 +246,7 @@
 <body>
   <section id="login-screen" class="login-screen">
     <form id="login-form" class="login-card">
-      <div class="brand-mark" aria-hidden="true">🔐</div>
+      <div class="brand-mark" aria-hidden="true">🍽️</div>
       <h1>License Manager</h1>
       <p>Διαχείριση καταστημάτων, αδειών και εγκαταστάσεων RestaurantOrders.</p>
       <label class="field">Email
@@ -219,18 +264,16 @@
   <div id="app" class="app-shell hidden">
     <aside class="sidebar" aria-label="Κύρια πλοήγηση">
       <div class="side-brand">
-        <div class="brand-mark" aria-hidden="true">🔐</div>
-        <div><strong>RestaurantOrders</strong><small>License Manager</small></div>
+        <div class="brand-mark" aria-hidden="true">🍽️</div>
+        <div><strong>Restaurant POS</strong><small>License Manager</small></div>
       </div>
       <p class="nav-caption">Διαχείριση</p>
       <nav class="nav-list">
+        <button class="nav-item" type="button" data-view="overview"><span class="nav-icon">⌂</span> Αρχική</button>
+        <button class="nav-item active" type="button" data-view="customers" aria-current="page"><span class="nav-icon">▤</span> Καταστήματα <span id="customer-count" class="nav-count">0</span></button>
+        <button class="nav-item" type="button" data-view="categories"><span class="nav-icon">▱</span> Κατηγορίες <span id="category-count" class="nav-count">0</span></button>
         <button class="nav-item" type="button" data-view="editions"><span class="nav-icon">▣</span> Εκδόσεις αδειών</button>
-        <div class="nav-group">
-          <button class="nav-item nav-parent" type="button" data-view="installations"><span class="nav-icon">▦</span> Εγκαταστάσεις <span id="installation-count" class="nav-count">0</span></button>
-          <div class="nav-sublist" aria-label="Επιλογές εγκαταστάσεων">
-            <button class="nav-item nav-subitem active" type="button" data-view="customers" aria-current="page"><span class="nav-icon">▤</span> Καταστήματα <span id="customer-count" class="nav-count">0</span></button>
-          </div>
-        </div>
+        <button class="nav-item" type="button" data-view="installations"><span class="nav-icon">▦</span> Εγκαταστάσεις <span id="installation-count" class="nav-count">0</span></button>
       </nav>
       <div class="sidebar-bottom"><div class="connection"><span class="connection-dot"></span> Συνδεδεμένο με τον server</div></div>
     </aside>
@@ -240,6 +283,7 @@
         <div><h1 id="page-title">Καταστήματα</h1><p id="page-subtitle">Καρτέλες καταστημάτων, στοιχεία και άδειες χρήσης.</p></div>
         <div class="top-actions">
           <label class="search"><span aria-hidden="true">⌕</span><input id="customer-search" type="search" placeholder="Αναζήτηση καταστήματος…" aria-label="Αναζήτηση καταστήματος"></label>
+          <button id="new-customer-button" class="btn small hidden" type="button">＋ Νέο κατάστημα</button>
           <button id="logout" class="btn secondary small" type="button">Αποσύνδεση</button>
         </div>
       </header>
@@ -262,15 +306,21 @@
     let lastUserActivityAt = 0;
     let lastSessionRefreshAt = 0;
     let idleTimer;
-    let dashboard = { customers: [], licenses: [], installations: [], editions: [] };
+    let dashboard = { customers: [], licenses: [], installations: [], editions: [], categories: [], audit: [] };
     let activeView = 'customers';
     let selectedCustomerId = null;
+    let selectedCustomerTab = 'details';
+    let creatingCustomerLicense = false;
+    let editingCustomerProfile = false;
+    let selectedCategoryFilter = 'all';
     let showArchived = false;
     let toastTimer;
     const byId = id => document.getElementById(id);
     const content = byId('content');
     const titles = {
+      overview: ['Αρχική', 'Μια καθαρή εικόνα της κατάστασης αδειών και καταστημάτων.'],
       customers: ['Καταστήματα', 'Καρτέλες καταστημάτων, στοιχεία και άδειες χρήσης.'],
+      categories: ['Κατηγορίες', 'Οργάνωσε τα καταστήματα σε ομάδες που ταιριάζουν στη λειτουργία σου.'],
       editions: ['Εκδόσεις αδειών', 'Ορισμός διαθέσιμων προγραμμάτων και ορίων εγκαταστάσεων.'],
       installations: ['Εγκαταστάσεις', 'Σύνδεση, ανάθεση και επανασύνδεση συσκευών.']
     };
@@ -378,7 +428,14 @@
       dashboard.licenses ||= [];
       dashboard.installations ||= [];
       dashboard.editions ||= [];
+      dashboard.categories ||= [];
+      dashboard.audit ||= [];
+      if (selectedCategoryFilter !== 'all' && selectedCategoryFilter !== '__none' &&
+          !dashboard.categories.some(item => item.id === selectedCategoryFilter)) selectedCategoryFilter = 'all';
+      if (!dashboard.customers.some(item => item.id === selectedCustomerId))
+        selectedCustomerId = dashboard.customers.find(item => item.isActive)?.id || dashboard.customers[0]?.id || null;
       byId('customer-count').textContent = String(dashboard.customers.filter(item => item.isActive).length);
+      byId('category-count').textContent = String(dashboard.categories.length);
       byId('installation-count').textContent = String(dashboard.installations.length);
       drawStats();
       drawView();
@@ -414,10 +471,36 @@
         if (active) nav.setAttribute('aria-current', 'page');
         else nav.removeAttribute('aria-current');
       }
-      byId('customer-search').classList.toggle('hidden', activeView !== 'customers');
+      byId('customer-search').parentElement.classList.toggle('hidden', activeView !== 'customers');
+      byId('new-customer-button').classList.toggle('hidden', activeView !== 'customers');
       if (activeView === 'customers') drawCustomers();
+      else if (activeView === 'categories') drawCategories();
       else if (activeView === 'editions') drawEditions();
-      else drawInstallations();
+      else if (activeView === 'installations') drawInstallations();
+      else drawOverview();
+    }
+    function drawOverview() {
+      const heading = element('div', 'section-heading');
+      const intro = element('div');
+      intro.append(element('h2', '', 'Γρήγορη πρόσβαση'), element('p', '', 'Οι βασικές ενότητες του License Manager, οργανωμένες σε ένα σημείο.'));
+      heading.append(intro);
+      const cards = element('div', 'overview-grid');
+      const views = [
+        ['▤', 'Καταστήματα', `${dashboard.customers.filter(item => item.isActive).length} ενεργά καταστήματα`, 'customers'],
+        ['▱', 'Κατηγορίες', `${dashboard.categories.length} κατηγορίες`, 'categories'],
+        ['▣', 'Εκδόσεις αδειών', `${dashboard.editions.filter(item => item.isActive).length} διαθέσιμες εκδόσεις`, 'editions'],
+        ['▦', 'Εγκαταστάσεις', `${dashboard.installations.length} συσκευές`, 'installations']
+      ];
+      for (const [icon, title, detail, view] of views) {
+        const card = element('article', 'panel overview-card');
+        card.append(element('span', 'overview-icon', icon), element('h3', '', title), element('p', '', detail));
+        const open = element('button', 'btn secondary small', 'Άνοιγμα ενότητας →');
+        open.type = 'button';
+        open.addEventListener('click', () => { activeView = view; drawView(); });
+        card.append(open);
+        cards.append(card);
+      }
+      content.replaceChildren(heading, cards);
     }
     function emptyState(title, detail, icon = '◇') {
       const root = element('div', 'empty-state');
@@ -430,25 +513,39 @@
     function drawCustomers() {
       const heading = element('div', 'section-heading');
       const headingText = element('div');
-      headingText.append(element('h2', '', 'Καταστήματα'), element('p', '', 'Επίλεξε κατάστημα για να δεις ή να επεξεργαστείς την καρτέλα του.'));
-      const add = element('button', 'btn'); add.type = 'button'; add.textContent = '+ Νέο κατάστημα'; add.addEventListener('click', openCustomerModal);
-      heading.append(headingText, add);
+      headingText.append(element('h2', '', 'Κατάλογος καταστημάτων'), element('p', '', 'Επίλεξε κατάστημα για να δεις και να επεξεργαστείς τα στοιχεία, τις άδειες και τις συσκευές του.'));
+      heading.append(headingText);
+
+      const filters = element('div', 'customer-filters');
+      const categoryFilter = document.createElement('select');
+      option(categoryFilter, 'Όλες οι κατηγορίες', 'all');
+      option(categoryFilter, 'Χωρίς κατηγορία', '__none');
+      for (const category of dashboard.categories) option(categoryFilter, category.name, category.id);
+      categoryFilter.value = selectedCategoryFilter;
+      categoryFilter.setAttribute('aria-label', 'Φίλτρο κατηγορίας');
+      categoryFilter.addEventListener('change', () => { selectedCategoryFilter = categoryFilter.value; drawCustomers(); });
+      filters.append(field('Κατηγορία', categoryFilter));
 
       const layout = element('div', 'customer-layout');
       const listPanel = element('section', 'panel');
       const listHead = element('div', 'panel-head');
-      listHead.append(element('h2', '', 'Καταστήματα'));
+      const list = element('div', 'customer-list');
+      const query = byId('customer-search').value.trim().toLocaleLowerCase('el-GR');
+      const customers = dashboard.customers.filter(customer => {
+        const matchesStatus = showArchived || customer.isActive;
+        const matchesCategory = selectedCategoryFilter === 'all' ||
+          (selectedCategoryFilter === '__none' ? !customer.categoryId : customer.categoryId === selectedCategoryFilter);
+        const searchable = `${customer.shopName} ${customer.storeIdentifier} ${customer.resellerName} ${customer.categoryName || ''}`.toLocaleLowerCase('el-GR');
+        return matchesStatus && matchesCategory && searchable.includes(query);
+      });
+      listHead.append(element('h2', '', `Καταστήματα · ${customers.length}`));
       const archiveLabel = element('label', 'archive-toggle');
       const archiveInput = input('showArchived', '', 'checkbox');
       archiveInput.checked = showArchived;
       archiveInput.addEventListener('change', () => { showArchived = archiveInput.checked; drawCustomers(); });
       archiveLabel.append(archiveInput, document.createTextNode('Αρχειοθετημένοι'));
       listHead.append(archiveLabel);
-      const list = element('div', 'customer-list');
-      const query = byId('customer-search').value.trim().toLocaleLowerCase('el-GR');
-      const customers = dashboard.customers.filter(customer => (showArchived || customer.isActive) &&
-        `${customer.shopName} ${customer.storeIdentifier} ${customer.resellerName}`.toLocaleLowerCase('el-GR').includes(query));
-      if (!customers.length) list.append(emptyState(showArchived ? 'Δεν βρέθηκαν καταστήματα' : 'Δεν υπάρχουν καταστήματα ακόμα', 'Πρόσθεσε ένα κατάστημα για να δημιουργήσεις την πρώτη καρτέλα.', '♙'));
+      if (!customers.length) list.append(emptyState(showArchived ? 'Δεν βρέθηκαν καταστήματα' : 'Δεν υπάρχουν καταστήματα', 'Δοκίμασε διαφορετικό φίλτρο ή πρόσθεσε ένα νέο κατάστημα.', '♙'));
       for (const customer of customers) {
         const row = element('button', `customer-row${selectedCustomerId === customer.id ? ' selected' : ''}${customer.isActive ? '' : ' archived'}`);
         row.type = 'button';
@@ -456,9 +553,10 @@
         row.append(element('span', 'avatar', initials || 'Π'));
         const info = element('span');
         info.append(element('strong', '', customer.shopName), element('small', '', customer.storeIdentifier),
+          element('span', 'customer-row-meta', customer.categoryName || 'Χωρίς κατηγορία'),
           element('span', 'mini-status', customer.isActive ? `${customer.activeLicenseCount} ενεργές άδειες` : 'Αρχειοθετημένο'));
         row.append(info);
-        row.addEventListener('click', () => { selectedCustomerId = customer.id; drawCustomers(); });
+        row.addEventListener('click', () => { selectedCustomerId = customer.id; selectedCustomerTab = 'details'; editingCustomerProfile = false; creatingCustomerLicense = false; drawCustomers(); });
         list.append(row);
       }
       listPanel.append(listHead, list);
@@ -472,7 +570,69 @@
         drawCustomerProfile(profilePanel, customer);
       }
       layout.append(profilePanel);
-      content.replaceChildren(heading, layout);
+      content.replaceChildren(heading, filters, layout);
+    }
+
+    function drawCategories() {
+      const heading = element('div', 'section-heading');
+      const intro = element('div');
+      intro.append(element('h2', '', 'Ομάδες καταστημάτων'), element('p', '', 'Δημιούργησε κατηγορίες για να οργανώνεις και να φιλτράρεις εύκολα τα καταστήματα.'));
+      heading.append(intro);
+
+      const createPanel = element('section', 'panel category-create');
+      const createHead = element('div', 'panel-head'); createHead.append(element('h2', '', 'Νέα κατηγορία'));
+      const createBody = element('div', 'panel-body');
+      const createForm = element('form', 'category-create-form');
+      const name = input('name', '', 'text', true); name.maxLength = 80; name.placeholder = 'π.χ. Εστιατόρια';
+      const save = element('button', 'btn'); save.type = 'submit'; save.textContent = '＋ Δημιουργία κατηγορίας';
+      createForm.append(field('Όνομα κατηγορίας', name), save);
+      createForm.addEventListener('submit', async event => {
+        event.preventDefault();
+        try {
+          await api('/api/license-manager/v1/categories', 'POST', { name: name.value.trim() });
+          await refreshDashboard(); toast('Η κατηγορία δημιουργήθηκε.');
+        } catch (error) { toast(error.message, true); }
+      });
+      createBody.append(createForm); createPanel.append(createHead, createBody);
+
+      const listHeading = element('div', 'section-heading category-list-heading');
+      listHeading.append(element('h2', '', `Κατηγορίες · ${dashboard.categories.length}`));
+      const list = element('div', 'category-grid');
+      if (!dashboard.categories.length) list.append(emptyState('Δεν υπάρχουν κατηγορίες ακόμα', 'Δημιούργησε την πρώτη κατηγορία για να αρχίσεις να οργανώνεις τα καταστήματα.', '▱'));
+      for (const category of dashboard.categories) {
+        const card = element('form', 'panel category-card');
+        const title = element('div', 'category-card-title');
+        title.append(element('span', 'category-icon', '▱'), element('span', '', `${category.customerCount} ${category.customerCount === 1 ? 'κατάστημα' : 'καταστήματα'}`));
+        const categoryName = input('name', category.name, 'text', true); categoryName.maxLength = 80;
+        const openStores = element('button', 'btn ghost small'); openStores.type = 'button'; openStores.textContent = 'Καταστήματα →';
+        openStores.addEventListener('click', () => {
+          selectedCategoryFilter = category.id;
+          activeView = 'customers';
+          drawView();
+        });
+        const saveChanges = element('button', 'btn secondary small'); saveChanges.type = 'submit'; saveChanges.textContent = 'Αποθήκευση';
+        const remove = element('button', 'btn danger small'); remove.type = 'button'; remove.textContent = 'Διαγραφή';
+        remove.addEventListener('click', async () => {
+          const detail = category.customerCount ? ` Τα ${category.customerCount} καταστήματα θα μείνουν χωρίς κατηγορία.` : '';
+          if (!confirm(`Να διαγραφεί η κατηγορία «${category.name}»;${detail}`)) return;
+          try {
+            await api(`/api/license-manager/v1/categories/${category.id}`, 'DELETE');
+            if (selectedCategoryFilter === category.id) selectedCategoryFilter = 'all';
+            await refreshDashboard(); toast('Η κατηγορία διαγράφηκε.');
+          } catch (error) { toast(error.message, true); }
+        });
+        const actions = element('div', 'category-actions'); actions.append(openStores, saveChanges, remove);
+        card.append(title, field('Όνομα κατηγορίας', categoryName), actions);
+        card.addEventListener('submit', async event => {
+          event.preventDefault();
+          try {
+            await api(`/api/license-manager/v1/categories/${category.id}`, 'PUT', { name: categoryName.value.trim() });
+            await refreshDashboard(); toast('Η κατηγορία ενημερώθηκε.');
+          } catch (error) { toast(error.message, true); }
+        });
+        list.append(card);
+      }
+      content.replaceChildren(heading, createPanel, listHeading, list);
     }
 
     function drawCustomerProfile(panel, customer) {
@@ -487,15 +647,17 @@
       header.append(title);
       const actions = element('div', 'profile-actions');
       if (customer.isActive) {
+        const editCustomer = element('button', 'btn secondary small'); editCustomer.type = 'button'; editCustomer.textContent = '✎ Επεξεργασία';
+        editCustomer.addEventListener('click', () => { selectedCustomerTab = 'details'; editingCustomerProfile = true; drawCustomers(); });
         const addLicense = element('button', 'btn small'); addLicense.type = 'button'; addLicense.textContent = '+ Νέα άδεια';
-        addLicense.addEventListener('click', () => body.querySelector('[data-create-license]')?.classList.toggle('hidden'));
+        addLicense.addEventListener('click', () => { selectedCustomerTab = 'licenses'; creatingCustomerLicense = true; drawCustomers(); });
         const del = element('button', 'btn danger small'); del.type = 'button'; del.textContent = 'Απενεργοποίηση';
         del.addEventListener('click', async () => {
           if (!confirm(`Να απενεργοποιηθεί και να αρχειοθετηθεί το κατάστημα «${customer.shopName}»; Θα ανακληθούν όλες οι άδειές του.`)) return;
           try { await api(`/api/license-manager/v1/customers/${customer.id}`, 'DELETE'); showArchived = true; await refreshDashboard(); toast('Το κατάστημα αρχειοθετήθηκε και οι άδειές του ανακλήθηκαν.'); }
           catch (error) { toast(error.message, true); }
         });
-        actions.append(addLicense, del);
+        actions.append(editCustomer, addLicense, del);
       } else {
         const restore = element('button', 'btn secondary small'); restore.type = 'button'; restore.textContent = 'Επαναφορά καταστήματος';
         restore.addEventListener('click', async () => {
@@ -512,35 +674,82 @@
       header.append(actions);
       body.append(header);
 
+      const tabs = element('div', 'profile-tabs');
+      tabs.setAttribute('role', 'tablist');
+      tabs.setAttribute('aria-label', 'Στοιχεία καταστήματος');
+      const tabContent = element('div', 'profile-tab-content');
+      tabContent.setAttribute('role', 'tabpanel');
+      for (const [key, label] of [['details', 'Στοιχεία'], ['licenses', 'Άδειες'], ['installations', 'Εγκαταστάσεις'], ['history', 'Ιστορικό']]) {
+        const tab = element('button', `profile-tab${selectedCustomerTab === key ? ' active' : ''}`, label);
+        tab.type = 'button';
+        tab.setAttribute('role', 'tab');
+        tab.setAttribute('aria-selected', String(selectedCustomerTab === key));
+        tab.addEventListener('click', () => { selectedCustomerTab = key; creatingCustomerLicense = false; editingCustomerProfile = false; drawCustomers(); });
+        tabs.append(tab);
+      }
+      body.append(tabs, tabContent);
+
       const profileForm = element('form', 'form-grid');
+      const category = document.createElement('select'); category.name = 'categoryId';
+      option(category, 'Χωρίς κατηγορία', '');
+      for (const item of dashboard.categories) option(category, item.name, item.id);
+      category.value = customer.categoryId || '';
       profileForm.append(
         field('Αναγνωριστικό καταστήματος', input('storeIdentifier', customer.storeIdentifier, 'text', true)),
         field('Ονομασία καταστήματος', input('shopName', customer.shopName, 'text', true)),
         field('Όνομα μεταπωλητή', input('resellerName', customer.resellerName, 'text', true)),
-        field('ΑΦΜ', input('vatNumber', customer.vatNumber || '', 'text'))
+        field('ΑΦΜ', input('vatNumber', customer.vatNumber || '', 'text')),
+        field('Κατηγορία', category)
       );
-      for (const control of profileForm.querySelectorAll('input')) control.disabled = !customer.isActive;
-      const saveRow = element('div', 'field full');
-      const save = element('button', 'btn'); save.type = 'submit'; save.textContent = 'Αποθήκευση στοιχείων'; save.disabled = !customer.isActive;
-      saveRow.append(save);
-      profileForm.append(saveRow);
+      for (const control of profileForm.querySelectorAll('input,select')) control.disabled = !customer.isActive || !editingCustomerProfile;
+      if (editingCustomerProfile && customer.isActive) {
+        const saveRow = element('div', 'profile-save-row field full');
+        const cancel = element('button', 'btn secondary small'); cancel.type = 'button'; cancel.textContent = 'Άκυρο';
+        cancel.addEventListener('click', () => { editingCustomerProfile = false; drawCustomers(); });
+        const save = element('button', 'btn'); save.type = 'submit'; save.textContent = 'Αποθήκευση';
+        saveRow.append(cancel, save);
+        profileForm.append(saveRow);
+      }
       profileForm.addEventListener('submit', async event => {
         event.preventDefault();
         const values = Object.fromEntries(new FormData(profileForm));
         try {
-          await api(`/api/license-manager/v1/customers/${customer.id}`, 'PUT', values);
+          await api(`/api/license-manager/v1/customers/${customer.id}`, 'PUT', { ...values, categoryId: values.categoryId || null });
+          editingCustomerProfile = false;
           await refreshDashboard(); toast('Τα στοιχεία του καταστήματος αποθηκεύτηκαν.');
         } catch (error) { toast(error.message, true); }
       });
-      body.append(profileForm);
-      body.append(element('div', 'divider'));
+      if (selectedCustomerTab === 'details') {
+        tabContent.append(profileForm);
+        const links = element('div', 'quick-links');
+        const customerLicenses = dashboard.licenses.filter(item => item.customerId === customer.id);
+        const customerInstallations = dashboard.installations.filter(item => item.storeIdentifier === customer.storeIdentifier);
+        const assignedEditions = [...new Set(customerLicenses.map(item => item.editionName).filter(Boolean))];
+        const shortcuts = [
+          ['⌁', 'Άδειες χρήσης', `${customerLicenses.length} συνολικά`, 'licenses'],
+          ['▦', 'Εγκαταστάσεις', `${customerInstallations.length} συσκευές`, 'installations'],
+          ['▣', 'Εκδόσεις προϊόντος', assignedEditions.join(' · ') || 'Δεν έχουν εκδοθεί άδειες', 'licenses']
+        ];
+        for (const [icon, label, detail, tab] of shortcuts) {
+          const link = element('button', 'quick-link'); link.type = 'button';
+          link.append(element('span', 'quick-link-icon', icon));
+          const copy = element('span'); copy.append(element('strong', '', label), element('small', '', detail));
+          link.append(copy);
+          link.addEventListener('click', () => {
+            if (tab === 'editions') { activeView = 'editions'; drawView(); }
+            else { selectedCustomerTab = tab; editingCustomerProfile = false; drawCustomers(); }
+          });
+          links.append(link);
+        }
+        tabContent.append(links);
+      }
 
       const licenseHeader = element('div', 'license-head');
       licenseHeader.append(element('h3', '', 'Άδειες χρήσης'));
       licenseHeader.append(element('span', 'muted', `${dashboard.licenses.filter(item => item.customerId === customer.id).length} συνολικά`));
-      body.append(licenseHeader);
+      if (selectedCustomerTab === 'licenses') tabContent.append(licenseHeader);
 
-      const createForm = element('form', 'license-card hidden');
+      const createForm = element('form', `license-card${creatingCustomerLicense ? '' : ' hidden'}`);
       createForm.dataset.createLicense = '';
       createForm.innerHTML = '<div class="license-card-top"><div><strong>Νέα άδεια</strong><small>Επίλεξε έκδοση και ημερομηνία λήξης.</small></div><span class="badge wait">ΝΕΑ</span></div>';
       const fields = element('div', 'license-fields');
@@ -561,24 +770,88 @@
       createForm.append(fields);
       const createActions = element('div', 'license-actions');
       const issue = element('button', 'btn small'); issue.type = 'submit'; issue.textContent = 'Δημιουργία άδειας'; issue.disabled = !customer.isActive || !dashboard.editions.some(item => item.isActive);
-      const cancel = element('button', 'btn secondary small'); cancel.type = 'button'; cancel.textContent = 'Άκυρο'; cancel.addEventListener('click', () => createForm.classList.add('hidden'));
+      const cancel = element('button', 'btn secondary small'); cancel.type = 'button'; cancel.textContent = 'Άκυρο'; cancel.addEventListener('click', () => { creatingCustomerLicense = false; createForm.classList.add('hidden'); });
       createActions.append(issue, cancel); createForm.append(createActions);
       createForm.addEventListener('submit', async event => {
         event.preventDefault();
         const values = Object.fromEntries(new FormData(createForm));
         try {
           await api(`/api/license-manager/v1/customers/${customer.id}/licenses`, 'POST', { editionId: values.editionId, expiresAtUtc: dateToUtc(values.expiresAtUtc) });
+          creatingCustomerLicense = false;
           await refreshDashboard(); toast('Η νέα άδεια δημιουργήθηκε.');
         } catch (error) { toast(error.message, true); }
       });
-      body.append(createForm);
+      if (selectedCustomerTab === 'licenses') tabContent.append(createForm);
 
       const licenses = dashboard.licenses.filter(item => item.customerId === customer.id);
       const stack = element('div', 'license-stack');
       if (!licenses.length) stack.append(element('div', 'empty-state', 'Δεν υπάρχουν άδειες για αυτό το κατάστημα.'));
       for (const license of licenses) stack.append(drawLicenseCard(license, customer.isActive));
-      body.append(stack);
+      if (selectedCustomerTab === 'licenses') tabContent.append(stack);
+      else if (selectedCustomerTab === 'installations') drawCustomerInstallations(tabContent, customer);
+      else if (selectedCustomerTab === 'history') drawCustomerHistory(tabContent, customer);
       panel.replaceChildren(body);
+    }
+
+    function drawCustomerInstallations(container, customer) {
+      const heading = element('div', 'section-heading compact-heading');
+      const copy = element('div');
+      const installations = dashboard.installations.filter(item => item.storeIdentifier === customer.storeIdentifier);
+      copy.append(element('h3', '', 'Συσκευές καταστήματος'), element('p', '', `${installations.length} εγκαταστάσεις συνδέθηκαν με αυτό το κατάστημα.`));
+      const manage = element('button', 'btn secondary small', 'Διαχείριση εγκαταστάσεων →');
+      manage.type = 'button'; manage.addEventListener('click', () => { activeView = 'installations'; drawView(); });
+      heading.append(copy, manage); container.append(heading);
+      if (!installations.length) {
+        container.append(emptyState('Δεν υπάρχουν εγκαταστάσεις', 'Οι συσκευές θα εμφανιστούν εδώ όταν συνδεθεί το POS.', '▦'));
+        return;
+      }
+      const list = element('div', 'installation-grid');
+      for (const item of installations) {
+        const card = element('article', 'panel installation-card compact-installation');
+        const title = element('div');
+        title.append(element('strong', '', item.machineName || 'Υπολογιστής'),
+          element('div', 'muted', `Τελευταία σύνδεση: ${new Date(item.lastSeenAtUtc).toLocaleString('el-GR')}`),
+          element('div', 'muted', `ID: ${item.installationId}`));
+        const state = item.rebindPending ? 'Αναμονή επανασύνδεσης' : item.isAssigned ? (item.licenseStatus || 'Ανατεθειμένη').toUpperCase() : 'Χωρίς άδεια';
+        card.append(title, element('span', `badge${item.isAssigned && item.licenseStatus === 'active' ? '' : ' off'}`, state));
+        list.append(card);
+      }
+      container.append(list);
+    }
+
+    function drawCustomerHistory(container, customer) {
+      const heading = element('div', 'section-heading compact-heading');
+      heading.append(element('div', '', 'Ιστορικό ενεργειών'));
+      container.append(heading);
+      const history = dashboard.audit.filter(item => item.customerId === customer.id);
+      if (!history.length) {
+        container.append(emptyState('Δεν υπάρχουν καταγεγραμμένες ενέργειες', 'Οι ενέργειες αδειών και συσκευών θα εμφανίζονται εδώ.', '◷'));
+        return;
+      }
+      const labels = {
+        'customer-created': 'Δημιουργήθηκε το κατάστημα',
+        'customer-updated': 'Ενημερώθηκαν τα στοιχεία καταστήματος',
+        'customer-deleted': 'Το κατάστημα αρχειοθετήθηκε',
+        'customer-restored': 'Το κατάστημα επανενεργοποιήθηκε',
+        created: 'Δημιουργήθηκε άδεια',
+        'terms-updated': 'Ενημερώθηκαν τα στοιχεία άδειας',
+        renewed: 'Ανανεώθηκε άδεια',
+        revoked: 'Ανακλήθηκε άδεια',
+        assigned: 'Ανατέθηκε άδεια σε συσκευή',
+        detached: 'Αποσυνδέθηκε συσκευή από άδεια',
+        'rebind-requested': 'Ζητήθηκε επανασύνδεση συσκευής'
+      };
+      const list = element('div', 'history-list');
+      for (const item of history) {
+        const row = element('article', 'history-row');
+        const icon = element('span', 'history-icon', item.installationId ? '▦' : '•');
+        const info = element('div');
+        info.append(element('strong', '', labels[item.action] || item.action),
+          element('small', '', new Date(item.createdAtUtc).toLocaleString('el-GR')));
+        if (item.licenseId) info.append(element('small', 'muted', `Άδεια ${item.licenseId}`));
+        row.append(icon, info); list.append(row);
+      }
+      container.append(list);
     }
 
     function openPermanentDeleteDialog(customer) {
@@ -700,11 +973,15 @@
       const close = element('button', 'btn secondary icon'); close.type = 'button'; close.textContent = '×'; close.setAttribute('aria-label', 'Κλείσιμο'); close.addEventListener('click', () => root.replaceChildren());
       head.append(title, close);
       const form = element('form', 'form-grid');
+      const category = document.createElement('select'); category.name = 'categoryId';
+      option(category, 'Χωρίς κατηγορία', '');
+      for (const item of dashboard.categories) option(category, item.name, item.id);
       form.append(
         field('Αναγνωριστικό καταστήματος', input('storeIdentifier', '', 'text', true), 'full'),
         field('Ονομασία καταστήματος', input('shopName', '', 'text', true)),
         field('Όνομα μεταπωλητή', input('resellerName', '', 'text', true)),
-        field('ΑΦΜ', input('vatNumber', '', 'text'))
+        field('ΑΦΜ', input('vatNumber', '', 'text')),
+        field('Κατηγορία', category)
       );
       const actions = element('div', 'modal-actions field full');
       const cancel = element('button', 'btn secondary'); cancel.type = 'button'; cancel.textContent = 'Άκυρο'; cancel.addEventListener('click', () => root.replaceChildren());
@@ -714,8 +991,8 @@
         event.preventDefault();
         const values = Object.fromEntries(new FormData(form));
         try {
-          const result = await api('/api/license-manager/v1/customers', 'POST', values);
-          selectedCustomerId = result.customerId; showArchived = false; root.replaceChildren();
+          const result = await api('/api/license-manager/v1/customers', 'POST', { ...values, categoryId: values.categoryId || null });
+          selectedCustomerId = result.customerId; selectedCustomerTab = 'details'; showArchived = false; root.replaceChildren();
           await refreshDashboard(); toast('Η καρτέλα του καταστήματος δημιουργήθηκε. Τώρα μπορείς να εκδώσεις άδεια.');
         } catch (error) { toast(error.message, true); }
       });
@@ -831,10 +1108,12 @@
 
     document.querySelectorAll('.nav-item').forEach(nav => nav.addEventListener('click', () => {
       activeView = nav.dataset.view;
+      editingCustomerProfile = false;
       drawView();
       recordActivity();
     }));
     byId('customer-search').addEventListener('input', () => { if (activeView === 'customers') drawCustomers(); });
+    byId('new-customer-button').addEventListener('click', openCustomerModal);
     byId('logout').addEventListener('click', () => void endSession(false));
     byId('login-form').addEventListener('submit', async event => {
       event.preventDefault();

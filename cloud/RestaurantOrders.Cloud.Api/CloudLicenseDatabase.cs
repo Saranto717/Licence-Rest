@@ -187,28 +187,64 @@ public sealed class CloudLicenseDatabase(NpgsqlDataSource dataSource)
         return id;
     }
 
+    public async Task<Guid> CreateCategoryAsync(string name, CancellationToken cancellationToken)
+    {
+        var id = Guid.NewGuid();
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using var command = new NpgsqlCommand("""
+            INSERT INTO cloud_license_categories (id, name)
+            VALUES (@id, @name)
+            """, connection);
+        command.Parameters.AddWithValue("id", NpgsqlDbType.Uuid, id);
+        command.Parameters.AddWithValue("name", NpgsqlDbType.Varchar, name);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+        return id;
+    }
+
+    public async Task<bool> UpdateCategoryAsync(Guid categoryId, string name, CancellationToken cancellationToken)
+    {
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using var command = new NpgsqlCommand("""
+            UPDATE cloud_license_categories
+            SET name = @name, updated_at_utc = now()
+            WHERE id = @id
+            """, connection);
+        command.Parameters.AddWithValue("id", NpgsqlDbType.Uuid, categoryId);
+        command.Parameters.AddWithValue("name", NpgsqlDbType.Varchar, name);
+        return await command.ExecuteNonQueryAsync(cancellationToken) == 1;
+    }
+
+    public async Task<bool> DeleteCategoryAsync(Guid categoryId, CancellationToken cancellationToken)
+    {
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using var command = new NpgsqlCommand("DELETE FROM cloud_license_categories WHERE id = @id", connection);
+        command.Parameters.AddWithValue("id", NpgsqlDbType.Uuid, categoryId);
+        return await command.ExecuteNonQueryAsync(cancellationToken) == 1;
+    }
+
     public async Task<Guid> CreateCustomerAsync(
-        string storeIdentifier, string shopName, string resellerName, string vatNumber,
+        string storeIdentifier, string shopName, string resellerName, string vatNumber, Guid? categoryId,
         CancellationToken cancellationToken)
     {
         var id = Guid.NewGuid();
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
         await using var command = new NpgsqlCommand("""
-            INSERT INTO cloud_license_customers (id, store_identifier, shop_name, reseller_name, vat_number)
-            VALUES (@id, @store_identifier, @shop_name, @reseller_name, @vat_number)
+            INSERT INTO cloud_license_customers (id, store_identifier, shop_name, reseller_name, vat_number, category_id)
+            VALUES (@id, @store_identifier, @shop_name, @reseller_name, @vat_number, @category_id)
             """, connection);
         command.Parameters.AddWithValue("id", NpgsqlDbType.Uuid, id);
         command.Parameters.AddWithValue("store_identifier", NpgsqlDbType.Varchar, storeIdentifier);
         command.Parameters.AddWithValue("shop_name", NpgsqlDbType.Varchar, shopName);
         command.Parameters.AddWithValue("reseller_name", NpgsqlDbType.Varchar, resellerName);
         command.Parameters.AddWithValue("vat_number", NpgsqlDbType.Varchar, vatNumber);
+        command.Parameters.AddWithValue("category_id", NpgsqlDbType.Uuid, categoryId is null ? DBNull.Value : categoryId.Value);
         await command.ExecuteNonQueryAsync(cancellationToken);
         await AddAuditAsync(null, null, "customer-created", cancellationToken, id);
         return id;
     }
 
     public async Task<bool> UpdateCustomerAsync(
-        Guid customerId, string storeIdentifier, string shopName, string resellerName, string vatNumber,
+        Guid customerId, string storeIdentifier, string shopName, string resellerName, string vatNumber, Guid? categoryId,
         CancellationToken cancellationToken)
     {
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
@@ -218,6 +254,7 @@ public sealed class CloudLicenseDatabase(NpgsqlDataSource dataSource)
                 shop_name = @shop_name,
                 reseller_name = @reseller_name,
                 vat_number = @vat_number,
+                category_id = @category_id,
                 updated_at_utc = now()
             WHERE id = @id AND is_active = true
             """, connection);
@@ -226,6 +263,7 @@ public sealed class CloudLicenseDatabase(NpgsqlDataSource dataSource)
         command.Parameters.AddWithValue("shop_name", NpgsqlDbType.Varchar, shopName);
         command.Parameters.AddWithValue("reseller_name", NpgsqlDbType.Varchar, resellerName);
         command.Parameters.AddWithValue("vat_number", NpgsqlDbType.Varchar, vatNumber);
+        command.Parameters.AddWithValue("category_id", NpgsqlDbType.Uuid, categoryId is null ? DBNull.Value : categoryId.Value);
         if (await command.ExecuteNonQueryAsync(cancellationToken) != 1) return false;
         await using var syncLegacyFields = new NpgsqlCommand("""
             UPDATE cloud_licenses
@@ -236,6 +274,7 @@ public sealed class CloudLicenseDatabase(NpgsqlDataSource dataSource)
         syncLegacyFields.Parameters.AddWithValue("shop_name", NpgsqlDbType.Varchar, shopName);
         syncLegacyFields.Parameters.AddWithValue("vat_number", NpgsqlDbType.Varchar, vatNumber);
         await syncLegacyFields.ExecuteNonQueryAsync(cancellationToken);
+        await AddAuditAsync(null, null, "customer-updated", cancellationToken, customerId);
         return true;
     }
 
@@ -612,17 +651,21 @@ public sealed class CloudLicenseDatabase(NpgsqlDataSource dataSource)
         var licenses = new List<ManagedLicenseView>();
         var installations = new List<ManagedInstallationView>();
         var editions = new List<ManagedLicenseEditionView>();
+        var categories = new List<ManagedLicenseManagerCategoryView>();
+        var audit = new List<ManagedCustomerAuditView>();
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
 
         await using (var command = new NpgsqlCommand("""
             SELECT c.id, c.store_identifier, c.shop_name, c.reseller_name, c.vat_number,
                    c.is_active, c.created_at_utc,
                    count(DISTINCT l.id) FILTER (WHERE c.is_active AND l.status = 'active' AND (l.expires_at_utc IS NULL OR l.expires_at_utc > now())),
-                   count(DISTINCT i.installation_id) FILTER (WHERE c.is_active AND i.is_assigned AND l.status = 'active' AND (l.expires_at_utc IS NULL OR l.expires_at_utc > now()))
+                   count(DISTINCT i.installation_id) FILTER (WHERE c.is_active AND i.is_assigned AND l.status = 'active' AND (l.expires_at_utc IS NULL OR l.expires_at_utc > now())),
+                   c.category_id, category.name
             FROM cloud_license_customers c
+            LEFT JOIN cloud_license_categories category ON category.id = c.category_id
             LEFT JOIN cloud_licenses l ON l.customer_id = c.id
             LEFT JOIN cloud_license_installations i ON i.license_id = l.id
-            GROUP BY c.id
+            GROUP BY c.id, category.id
             ORDER BY c.is_active DESC, c.shop_name, c.created_at_utc DESC
             """, connection))
         await using (var reader = await command.ExecuteReaderAsync(cancellationToken))
@@ -630,7 +673,8 @@ public sealed class CloudLicenseDatabase(NpgsqlDataSource dataSource)
             while (await reader.ReadAsync(cancellationToken))
                 customers.Add(new ManagedCustomerView(reader.GetGuid(0), reader.GetString(1), reader.GetString(2),
                     reader.GetString(3), reader.GetString(4), reader.GetBoolean(5),
-                    Convert.ToInt32(reader.GetInt64(7)), Convert.ToInt32(reader.GetInt64(8)), reader.GetDateTime(6)));
+                    Convert.ToInt32(reader.GetInt64(7)), Convert.ToInt32(reader.GetInt64(8)), reader.GetDateTime(6),
+                    reader.IsDBNull(9) ? null : reader.GetGuid(9), reader.IsDBNull(10) ? null : reader.GetString(10)));
         }
 
         await using (var command = new NpgsqlCommand("""
@@ -670,6 +714,37 @@ public sealed class CloudLicenseDatabase(NpgsqlDataSource dataSource)
         }
 
         await using (var command = new NpgsqlCommand("""
+            SELECT category.id, category.name,
+                   count(customer.id),
+                   category.created_at_utc
+            FROM cloud_license_categories category
+            LEFT JOIN cloud_license_customers customer ON customer.category_id = category.id
+            GROUP BY category.id
+            ORDER BY lower(category.name)
+            """, connection))
+        await using (var reader = await command.ExecuteReaderAsync(cancellationToken))
+        {
+            while (await reader.ReadAsync(cancellationToken))
+                categories.Add(new ManagedLicenseManagerCategoryView(reader.GetGuid(0), reader.GetString(1),
+                    Convert.ToInt32(reader.GetInt64(2)), reader.GetDateTime(3)));
+        }
+
+        await using (var command = new NpgsqlCommand("""
+            SELECT id, customer_id, action, created_at_utc, license_id, installation_id
+            FROM cloud_license_audit
+            WHERE customer_id IS NOT NULL
+            ORDER BY created_at_utc DESC
+            LIMIT 1000
+            """, connection))
+        await using (var reader = await command.ExecuteReaderAsync(cancellationToken))
+        {
+            while (await reader.ReadAsync(cancellationToken))
+                audit.Add(new ManagedCustomerAuditView(reader.GetInt64(0), reader.GetGuid(1), reader.GetString(2),
+                    reader.GetDateTime(3), reader.IsDBNull(4) ? null : reader.GetGuid(4),
+                    reader.IsDBNull(5) ? null : reader.GetGuid(5)));
+        }
+
+        await using (var command = new NpgsqlCommand("""
             SELECT i.installation_id, i.machine_name, i.first_seen_at_utc, i.last_seen_at_utc,
                    i.license_id, c.shop_name, c.store_identifier,
                    CASE WHEN c.is_active THEN l.status ELSE 'revoked' END,
@@ -688,7 +763,7 @@ public sealed class CloudLicenseDatabase(NpgsqlDataSource dataSource)
                     reader.IsDBNull(7) ? null : reader.GetString(7), reader.GetBoolean(8), reader.GetBoolean(9)));
         }
 
-        return new LicenseManagerDashboard(customers, licenses, installations, editions);
+        return new LicenseManagerDashboard(customers, licenses, installations, editions, categories, audit);
     }
 
     private async Task AddAuditAsync(Guid? licenseId, Guid? installationId, string action,
